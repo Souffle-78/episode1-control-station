@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         win.resize(w, h)
     win.show()
 
-    if args.demo or args.screenshot:
+    if (args.demo or args.screenshot) and not backend.connected:
         backend.connect_device("DEMO")
 
     if args.screenshot:
