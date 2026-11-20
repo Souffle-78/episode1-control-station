@@ -33,7 +33,8 @@ jobs:
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
-          & .\dist\Episode1\Episode1.exe --screenshot dist\smoke.png --size 1440x900
+          $p = Start-Process -FilePath ".\dist\Episode1\Episode1.exe" -ArgumentList "--screenshot","dist\smoke.png","--size","1440x900" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Episode1.exe exited with $($p.ExitCode)" }
           if (!(Test-Path dist\smoke.png)) { throw "Windows exe did not produce a screenshot" }
           Get-Item dist\smoke.png | Format-List
       - uses: actions/upload-artifact@v4
