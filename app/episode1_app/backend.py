@@ -101,7 +101,7 @@ class DemoBackend(BackendBase):
         self._timer.setInterval(160)
         self._timer.timeout.connect(self._tick)
         self._noise = random.Random(7)
-        self._start_pose = [0.0, 25.0, -35.0, 15.0, 0.0, 0.0]
+        self._start_pose = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
     # ---- lifecycle -----------------------------------------------------
     def connect_device(self, port: str) -> None:
