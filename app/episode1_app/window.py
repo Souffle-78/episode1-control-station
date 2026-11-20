@@ -66,6 +66,13 @@ class MainWindow(QMainWindow):
         self._build_ui()
 
         self._attach_backend(self.backend)
+        # The packaged app starts in DEMO; make it live immediately so Move/Jog
+        # visibly work without hiding the connection workflow.
+        if self.demo and not self.backend.connected and str(self.port.currentText()).strip().upper() == "DEMO":
+            try:
+                self.backend.connect_device("DEMO")
+            except Exception as exc:
+                self._on_log("error", str(exc))
 
     def _attach_backend(self, backend: BackendBase) -> None:
         """Connect signals for a backend and detach the previous one."""
@@ -602,6 +609,11 @@ class MainWindow(QMainWindow):
         )
         if j.min_deg is not None and j.max_deg is not None:
             self.target_spin.setRange(j.min_deg, j.max_deg)
+        # Emm rejects motor RPM that rounds to 0; enforce the physical minimum.
+        min_rpm = max(0.01, 1.0 / j.gear_ratio) if j.gear_ratio else 0.01
+        self.rpm_spin.setMinimum(min_rpm)
+        if self.rpm_spin.value() < min_rpm:
+            self.rpm_spin.setValue(min_rpm)
         if not self.target_spin.hasFocus():
             self.target_spin.setValue(j.target)
         self.enable_btn.setText(tr("action.disable") if j.enabled else tr("action.enable"))

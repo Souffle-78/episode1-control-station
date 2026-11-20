@@ -474,6 +474,9 @@ class SlcanBackend(BackendBase):
         else:
             self._run(lambda: self._ctl.disable(cid), tr("log.disabled", index=index))
 
+    def _max_step(self) -> float:
+        return max(0.1, float(self._ctl.cfg.max_step_deg))
+
     def jog(self, index: int, delta_deg: float, rpm: float) -> None:
         if self._ctl is None:
             raise RuntimeError(tr("msg.connect_first"))
@@ -482,8 +485,13 @@ class SlcanBackend(BackendBase):
         target = self._ctl.state.angle(j.index) + delta_deg
         j.check_target(target)
         def fn():
-            self._ctl.move(cid, delta_deg, rpm=rpm, accel=1, wait=True,
-                           skip_voltage=False, allow_large=False, wait_timeout=30.0)
+            # armctl rejects a single move above max_step_deg; split it.
+            remaining = float(delta_deg)
+            while abs(remaining) > 1e-9:
+                step = max(-self._max_step(), min(self._max_step(), remaining))
+                self._ctl.move(cid, step, rpm=rpm, accel=1, wait=True,
+                               skip_voltage=False, allow_large=False, wait_timeout=30.0)
+                remaining -= step
         self._run(fn, tr("log.jog", index=index, delta=delta_deg, target=target, rpm=rpm))
 
     def move(self, index: int, angle_deg: float, rpm: float, accel: int) -> None:
@@ -495,8 +503,12 @@ class SlcanBackend(BackendBase):
         delta = angle_deg - current
         j.check_target(angle_deg)
         def fn():
-            self._ctl.move(cid, delta, rpm=rpm, accel=accel, wait=True,
-                           skip_voltage=False, allow_large=False, wait_timeout=60.0)
+            remaining = float(delta)
+            while abs(remaining) > 1e-9:
+                step = max(-self._max_step(), min(self._max_step(), remaining))
+                self._ctl.move(cid, step, rpm=rpm, accel=accel, wait=True,
+                               skip_voltage=False, allow_large=False, wait_timeout=60.0)
+                remaining -= step
         self._run(fn, tr("log.move", index=index, target=angle_deg, rpm=rpm, accel=accel))
 
     def move_all(self, angles: Iterable[float], rpm: float, accel: int) -> None:
@@ -511,8 +523,12 @@ class SlcanBackend(BackendBase):
         for j, target in zip(joints, values):
             j.check_target(target)
         def fn():
-            self._ctl.move_all(deltas, rpm=rpm, accel=accel, wait=True,
-                               skip_voltage=False, allow_large=False, wait_timeout=60.0)
+            remaining = [float(d) for d in deltas]
+            while max(abs(d) for d in remaining) > 1e-9:
+                chunk = [max(-self._max_step(), min(self._max_step(), d)) for d in remaining]
+                self._ctl.move_all(chunk, rpm=rpm, accel=accel, wait=True,
+                                   skip_voltage=False, allow_large=False, wait_timeout=60.0)
+                remaining = [r - c for r, c in zip(remaining, chunk)]
         self._run(fn, tr("log.move_all", values=", ".join(f"{v:+.1f}" for v in values), rpm=rpm))
 
     def stop_all(self) -> None:

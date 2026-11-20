@@ -164,6 +164,10 @@ class JointControlDialog(QDialog):
             return
         self.sel_label.setText(f"J{state.index}  {tr(f'joint.{state.index}')}")
         self.target.setRange(state.min_deg, state.max_deg)
+        min_rpm = max(0.01, 1.0 / state.gear_ratio) if state.gear_ratio else 0.01
+        self.rpm.setMinimum(min_rpm)
+        if self.rpm.value() < min_rpm:
+            self.rpm.setValue(min_rpm)
         if not self.target.hasFocus():
             self.target.setValue(state.target)
         self.enable_btn.setText(tr("action.disable") if state.enabled else tr("action.enable"))
