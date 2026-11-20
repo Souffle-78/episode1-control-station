@@ -500,6 +500,16 @@ class MainWindow(QMainWindow):
                 dialog.exec()
         except Exception as exc:
             self._on_log("error", f"{key}: {exc}")
+        if key != "overview":
+            # Dialogs are tools, not persistent pages; return to the live overview.
+            self.page_key = "overview"
+            for k, b in zip(self._nav_keys, self._nav_buttons):
+                active = k == "overview"
+                b.setProperty("active", active)
+                b.style().unpolish(b)
+                b.style().polish(b)
+            self.page_title.setText(tr("page.overview.title"))
+            self.page_sub.setText(tr("page.overview.sub"))
 
     # ------------------------------------------------------------- actions
     def _toggle_connection(self) -> None:

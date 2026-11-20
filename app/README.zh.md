@@ -11,7 +11,8 @@
 - Demo 模式：无硬件也能看完整界面、动效和日志
 - 真实 SLCAN 后端：扫描 ID 1–6、状态轮询、使能/失能、点动、绝对角度、六轴同步、停止、清保护、设零点
 - 安全约束：12–32 V 检查、软限位、未 zero 拒绝运动、六轴缺一不连接
-- 六轴状态卡、电压/电流/温度/周期、侧视示意图、事件日志
+- 六轴状态卡、电压/电流/温度/周期、**实时侧视姿态图**（零位=CAD 姿态，随关节角变化）、事件日志
+- 侧边栏是实际工具，不是空页面：关节控制打开六轴大面板；配置显示只读限位/减速比表；日志可复制/导出 TXT；正逆运动学打开 FK/IK 工作台
 - FK/IK 工作台：官方 DH 模型，FK 算 TCP，数值 IK 反解关节角（离线，不直接下发运动）
 - macOS `.app` 已构建并本机 smoke test；Windows `.exe` 已由 GitHub Actions 构建（x64）并通过 CI 启动/截图 smoke test
 
@@ -95,6 +96,8 @@ app/
 │   ├── backend.py                # DemoBackend / SlcanBackend
 │   ├── theme.py                  # 深色工业风
 │   ├── widgets.py                # JointCard / MetricCard / ArmCanvas / LogView
+│   ├── dialogs.py                # 关节控制 / 配置 / 日志窗口
+│   ├── kinematics_page.py        # FK/IK 工作台
 │   └── window.py                 # 主窗口、语言切换、命令面板
 ├── assets/icon.png|ico|icns      # 应用图标
 ├── build_macos.sh
@@ -113,7 +116,7 @@ IK 输入目标 x/y/z + RPY，用带关节限位的阻尼最小二乘求解，�
 
 ## 限制
 
-- 侧视示意图是示意，不是由 FK 实时驱动。
+- 侧视姿态图由软件关节角驱动，零位与 CAD 一致；它是示意投影，不是由 FK/ DH 计算的精确 TCP 图。
 - IK 结果需要人工确认软限位/碰撞后再下发；当前 UI 不自动执行。
 - Windows `.exe` 已通过 CI 启动/截图测试，但未连接真实 CAN 硬件；首次运行有 SmartScreen 提示。
 - 未做代码签名/公证；对外分发前需处理 Gatekeeper / SmartScreen。

@@ -77,6 +77,7 @@ class JointControlDialog(QDialog):
         self.target.setRange(-10000, 10000)
         self.target.setMinimumHeight(34)
         self.target.setMaximumWidth(300)
+        self.target.setStyleSheet("QDoubleSpinBox { padding-left: 14px; }")
         self.target.setDecimals(2)
         self.target.setSuffix(" °")
         lay.addWidget(self.target)
