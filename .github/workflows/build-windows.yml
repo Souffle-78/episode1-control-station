@@ -1,0 +1,36 @@
+name: build-windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/build-windows.yml"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          architecture: "x64"
+      - name: Install dependencies
+        run: |
+          python -m venv .venv-win
+          .venv-win\Scripts\python.exe -m pip install --upgrade pip
+          .venv-win\Scripts\python.exe -m pip install -r requirements.txt
+          .venv-win\Scripts\python.exe -m pip install "pyinstaller==6.22.3"
+      - name: Build exe
+        shell: pwsh
+        run: ./build_windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Episode1-Windows-x64
+          path: app/dist/Episode1-Windows-x64.zip
+          if-no-files-found: error

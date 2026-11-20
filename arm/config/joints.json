@@ -1,0 +1,73 @@
+{
+  "_comment": "Episode 1 六轴机械臂。min_deg/max_deg 未标定前保持 null，move 会拒绝。zero 把当前姿态定义为 0°。J2 零点在负限位上方约 50°，限位 -30..45。",
+  "arm": {
+    "gear_ratio": 25.0,
+    "microstep": null,
+    "max_output_rpm": 4.0,
+    "default_output_rpm": 1.0,
+    "max_step_deg": 10.0,
+    "firmware": "emm"
+  },
+  "joints": [
+    {
+      "joint": 1,
+      "id": 1,
+      "name": "J1_base_yaw",
+      "invert": false,
+      "min_deg": -160.0,
+      "max_deg": 160.0,
+      "max_output_rpm": 1.0,
+      "gear_ratio": 25.0
+    },
+    {
+      "joint": 2,
+      "id": 2,
+      "name": "J2_shoulder",
+      "invert": false,
+      "min_deg": -30.0,
+      "max_deg": 45.0,
+      "max_output_rpm": 1.0,
+      "gear_ratio": 20.0
+    },
+    {
+      "joint": 3,
+      "id": 3,
+      "name": "J3_elbow",
+      "invert": false,
+      "min_deg": -86.5,
+      "max_deg": 85.9,
+      "max_output_rpm": 1.0,
+      "gear_ratio": 25.0
+    },
+    {
+      "joint": 4,
+      "id": 4,
+      "name": "J4_wrist_pitch",
+      "invert": false,
+      "min_deg": -134.5,
+      "max_deg": 179.7,
+      "max_output_rpm": 1.0,
+      "gear_ratio": 10.0
+    },
+    {
+      "joint": 5,
+      "id": 5,
+      "name": "J5_wrist_roll",
+      "invert": false,
+      "min_deg": -99.1,
+      "max_deg": 100.9,
+      "max_output_rpm": 1.0,
+      "gear_ratio": 4.0
+    },
+    {
+      "joint": 6,
+      "id": 6,
+      "name": "J6_tool",
+      "invert": false,
+      "min_deg": -158.5,
+      "max_deg": 158.5,
+      "max_output_rpm": 1.0,
+      "gear_ratio": 1.0
+    }
+  ]
+}

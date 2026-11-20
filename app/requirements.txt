@@ -1,0 +1,5 @@
+PySide6==6.8.3
+python-can>=4.0,<5
+x42s-stepper[can]==0.2.0
+pyserial>=3.5
+numpy>=1.24
