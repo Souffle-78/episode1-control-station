@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
             self._on_snapshot(self.last_snapshot)
         if not self._log_entries:
             self._append_welcome()
-        self._set_compact(self.height() < 920)
+        self._set_compact(self.height() < 920, force=True)
 
     def _build_topbar(self) -> QWidget:
         bar = QFrame()
@@ -211,13 +211,17 @@ class MainWindow(QMainWindow):
         self.port = QComboBox()
         self.port.setEditable(True)
         ports = ["DEMO", "/dev/cu.usbmodem1101", "COM6"]
-        if self._last_port and self._last_port not in ports:
-            ports.insert(0, self._last_port)
+        saved_port = (self._last_port or "DEMO").strip()
+        if saved_port != "DEMO" and not (
+            saved_port.startswith("/dev/") or saved_port.upper().startswith("COM")
+        ):
+            saved_port = "DEMO"
+        self._last_port = saved_port
+        if saved_port not in ports:
+            ports.insert(0, saved_port)
         self.port.addItems(ports)
-        if self._last_port:
-            self.port.setCurrentText(self._last_port)
+        self.port.setCurrentText(saved_port)
         self.port.setMinimumWidth(190)
-        self.port.currentTextChanged.connect(self._remember_port)
         lay.addWidget(self.port)
 
         self.connect_btn = QPushButton(tr("connect"))
@@ -229,6 +233,7 @@ class MainWindow(QMainWindow):
         self.stop_top = QPushButton(tr("stop_all"))
         self.stop_top.setObjectName("Danger")
         self.stop_top.setFixedWidth(130)
+        self.stop_top.setToolTip(tr("stop.tip"))
         self.stop_top.clicked.connect(self._stop_all)
         lay.addWidget(self.stop_top)
         return bar
@@ -422,11 +427,13 @@ class MainWindow(QMainWindow):
         lay.addWidget(self._field_label(tr("field.jog")))
         jog_row = QHBoxLayout()
         jog_row.setSpacing(5)
+        self.jog_buttons: list[QPushButton] = []
         for text, delta in (("−5°", -5.0), ("−1°", -1.0), ("+1°", 1.0), ("+5°", 5.0)):
             b = QPushButton(text)
             b.setMinimumHeight(30)
             b.clicked.connect(lambda _=False, d=delta: self._jog(d))
             jog_row.addWidget(b)
+            self.jog_buttons.append(b)
         lay.addLayout(jog_row)
 
         self.move_btn = QPushButton(tr("action.move"))
@@ -497,11 +504,11 @@ class MainWindow(QMainWindow):
         row.addWidget(self.log)
         return row
 
-    def _set_compact(self, compact: bool) -> None:
-        if compact == getattr(self, "_compact", False):
+    def _set_compact(self, compact: bool, force: bool = False) -> None:
+        if not force and compact == getattr(self, "_compact", False):
             return
         self._compact = compact
-        for card in self.cards.values():
+        for card in getattr(self, "cards", {}).values():
             card.set_compact(compact)
         note = getattr(self, "command_note", None)
         if note is not None:
@@ -519,6 +526,20 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
         self._set_compact(self.height() < 920)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        try:
+            if self.backend.connected:
+                self.backend.disconnect_device()
+        except Exception:
+            pass
+        shutdown = getattr(self.backend, "shutdown", None)
+        if callable(shutdown):
+            try:
+                shutdown()
+            except Exception:
+                pass
+        super().closeEvent(event)
 
     # ------------------------------------------------------------- theme
     def _toggle_theme(self) -> None:
@@ -593,11 +614,14 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------- actions
     def _toggle_connection(self) -> None:
         if self.backend.connected:
-            self.backend.disconnect_device()
-            self.connect_btn.setText(tr("connect"))
+            try:
+                self.backend.disconnect_device()
+            except Exception as exc:  # noqa: BLE001
+                self._on_log("error", str(exc))
+            finally:
+                self.connect_btn.setText(tr("connect"))
             return
         port = self.port.currentText().strip() or "DEMO"
-        self._remember_port(port)
         target_cls = DemoBackend if port.upper() == "DEMO" else SlcanBackend
         if not isinstance(self.backend, target_cls):
             old = self.backend
@@ -607,6 +631,7 @@ class MainWindow(QMainWindow):
         try:
             self.connect_btn.setEnabled(False)
             self.backend.connect_device(port)
+            self._remember_port(port)
         except Exception as exc:  # noqa: BLE001
             self._on_log("error", tr("msg.connect_failed", error=exc))
         finally:
@@ -656,6 +681,7 @@ class MainWindow(QMainWindow):
             self.zero_btn,
             self.clear_btn,
             self.enable_btn,
+            *getattr(self, "jog_buttons", []),
         ):
             w.setEnabled(connected)
 

@@ -10,6 +10,7 @@ import math
 import os
 import random
 import sys
+import threading
 import time
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -291,7 +292,9 @@ class SlcanBackend(BackendBase):
         self._port = ""
         self._joints: List[JointState] = []
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="arm-can")
+        self._bus_lock = threading.RLock()
         self._poll_pending = False
+        self._generation = 0
         self._timer = QTimer(self)
         self._timer.setInterval(600)
         self._timer.timeout.connect(self._poll)
@@ -300,6 +303,8 @@ class SlcanBackend(BackendBase):
     def connect_device(self, port: str) -> None:
         if self._connected:
             self.disconnect_device()
+        self._generation += 1
+        self._poll_pending = False
         if getattr(sys, "frozen", False):
             base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
             arm_dir = base / "arm"
@@ -366,26 +371,56 @@ class SlcanBackend(BackendBase):
             if not ctl.state.valid:
                 self._emit_log("warn", tr("msg.state_invalid"))
         except Exception:
-            ctl.close()
+            try:
+                ctl.close()
+            except Exception:
+                pass
+            self._ctl = None
+            self._armctl = None
+            self._joints = []
             self._connected = False
             self.connectionChanged.emit(False)
             raise
 
     def disconnect_device(self) -> None:
+        # Invalidate in-flight poll callbacks before touching the bus.
+        self._connected = False
+        self._generation += 1
+        self._poll_pending = False
         self._timer.stop()
         if self._ctl is not None:
-            try:
-                self._ctl.stop_all(quiet=True)
-            finally:
-                self._ctl.close()
+            with self._bus_lock:
+                try:
+                    self._ctl.stop_all(quiet=True)
+                except Exception as exc:  # noqa: BLE001
+                    self._emit_log("error", str(exc))
+                finally:
+                    try:
+                        self._ctl.close()
+                    except Exception:
+                        pass
         self._ctl = None
-        self._connected = False
+        self._armctl = None
+        self._snapshot = Snapshot(
+            connected=False, port=self._port, protocol="SLCAN / 500 kbit/s",
+            joints=[], timestamp=datetime.now().strftime("%H:%M:%S"),
+        )
         self.connectionChanged.emit(False)
+        self.snapshotChanged.emit(self._snapshot)
         self._emit_log("warn", tr("log.closed"))
+
+    def shutdown(self) -> None:
+        """Stop the poll timer and release the executor at app exit."""
+        self._timer.stop()
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
     # ---- telemetry -----------------------------------------------------
     def _read_hw(self) -> Snapshot:
         assert self._ctl is not None
+        with self._bus_lock:
+            return self._read_hw_locked()
+
+    def _read_hw_locked(self) -> Snapshot:
         t0 = time.monotonic()
         voltage = current = temp = 0.0
         joints: List[JointState] = []
@@ -430,20 +465,30 @@ class SlcanBackend(BackendBase):
         if not self._connected or self._ctl is None or self._poll_pending:
             return
         self._poll_pending = True
+        gen = self._generation
         fut = self._executor.submit(self._read_hw)
         def done(f):
+            if gen != self._generation:
+                return
             self._poll_pending = False
             try:
                 self._snapshot = f.result()
                 self.snapshotChanged.emit(self._snapshot)
             except Exception as exc:
                 self.error.emit(str(exc))
+                self._emit_log("error", str(exc))
         fut.add_done_callback(done)
 
     # ---- helpers -------------------------------------------------------
     def _run(self, fn, ok_message: str = "") -> None:
-        fut = self._executor.submit(fn)
+        gen = self._generation
+        def guarded():
+            with self._bus_lock:
+                return fn()
+        fut = self._executor.submit(guarded)
         def done(f):
+            if gen != self._generation:
+                return
             try:
                 f.result()
             except Exception as exc:
@@ -482,9 +527,13 @@ class SlcanBackend(BackendBase):
             raise RuntimeError(tr("msg.connect_first"))
         cid = self._can(index)
         j = self._ctl.cfg.by_can_id(cid)
+        # Validate against the current state; recompute target in the worker
+        # so commands queued back-to-back do not use a stale base angle.
         target = self._ctl.state.angle(j.index) + delta_deg
         j.check_target(target)
         def fn():
+            target = self._ctl.state.angle(j.index) + delta_deg
+            j.check_target(target)
             # armctl rejects a single move above max_step_deg; split it.
             remaining = float(delta_deg)
             while abs(remaining) > 1e-9:
@@ -499,11 +548,9 @@ class SlcanBackend(BackendBase):
             raise RuntimeError(tr("msg.connect_first"))
         cid = self._can(index)
         j = self._ctl.cfg.by_can_id(cid)
-        current = self._ctl.state.angle(j.index)
-        delta = angle_deg - current
         j.check_target(angle_deg)
         def fn():
-            remaining = float(delta)
+            remaining = angle_deg - self._ctl.state.angle(j.index)
             while abs(remaining) > 1e-9:
                 step = max(-self._max_step(), min(self._max_step(), remaining))
                 self._ctl.move(cid, step, rpm=rpm, accel=accel, wait=True,
@@ -518,12 +565,11 @@ class SlcanBackend(BackendBase):
         joints = sorted(self._ctl.cfg.joints, key=lambda x: x.index)
         if len(values) != len(joints):
             raise ValueError("move-all needs six angles")
-        deltas = [target - self._ctl.state.angle(j.index)
-                  for j, target in zip(joints, values)]
         for j, target in zip(joints, values):
             j.check_target(target)
         def fn():
-            remaining = [float(d) for d in deltas]
+            remaining = [target - self._ctl.state.angle(j.index)
+                         for j, target in zip(joints, values)]
             while max(abs(d) for d in remaining) > 1e-9:
                 chunk = [max(-self._max_step(), min(self._max_step(), d)) for d in remaining]
                 self._ctl.move_all(chunk, rpm=rpm, accel=accel, wait=True,

@@ -160,7 +160,13 @@ class JointCard(QFrame):
 
     def set_offline(self) -> None:
         self.status.set_status(STATUS_OFFLINE)
-        self.power.setText("OFF")
+        self.power.setText(tr("off"))
+        self.angle.setText("—")
+        self.target.setText(f"{tr('target')}  —")
+        self.limits.setText(f"{tr('limits')}  —")
+        self.can.setText(f"CAN {self._index}")
+        self.bar.set_range(-180.0, 180.0, 0.0)
+        self._enabled = False
 
     def set_compact(self, compact: bool) -> None:
         """Small-window mode: hide the footer and reduce the card height."""

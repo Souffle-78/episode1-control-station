@@ -155,6 +155,8 @@ class JointControlDialog(QDialog):
             state = next((j for j in snap.joints if j.index == i), None)
             if state:
                 card.set_state(state, i == self.selected)
+        for w in (self.target, self.rpm, self.accel):
+            w.setEnabled(snap.connected and bool(snap.joints))
         self._update_selected()
 
     def _select(self, index: int) -> None:
@@ -179,35 +181,44 @@ class JointControlDialog(QDialog):
             self.target.setValue(state.target)
         self.enable_btn.setText(tr("action.disable") if state.enabled else tr("action.enable"))
 
-    def _move(self) -> None:
+    def _cmd(self, fn) -> None:
         if not self.backend.connected:
+            self.state_label.setText(tr("msg.connect_first"))
             return
-        self.backend.move(self.selected, self.target.value(), self.rpm.value(), int(self.accel.value()))
+        try:
+            fn()
+        except Exception as exc:  # noqa: BLE001
+            self.state_label.setText(str(exc))
+
+    def _move(self) -> None:
+        self._cmd(lambda: self.backend.move(
+            self.selected, self.target.value(), self.rpm.value(), int(self.accel.value())))
 
     def _jog(self, delta: float) -> None:
-        if not self.backend.connected:
-            return
-        self.backend.jog(self.selected, delta, self.rpm.value())
+        self._cmd(lambda: self.backend.jog(self.selected, delta, self.rpm.value()))
 
     def _toggle_selected(self) -> None:
         if not self.snap:
             return
         state = next((j for j in self.snap.joints if j.index == self.selected), None)
         if state:
-            self.backend.set_enabled(self.selected, not state.enabled)
+            self._cmd(lambda: self.backend.set_enabled(self.selected, not state.enabled))
 
     def _toggle(self, index: int, enabled: bool) -> None:
-        self.backend.set_enabled(index, enabled)
+        self._cmd(lambda: self.backend.set_enabled(index, enabled))
 
     def _zero(self) -> None:
+        if not self.backend.connected:
+            self.state_label.setText(tr("msg.connect_first"))
+            return
         if QMessageBox.question(self, tr("action.zero"), tr("msg.zero_confirm.body", index=self.selected)) == QMessageBox.StandardButton.Yes:
-            self.backend.zero(self.selected)
+            self._cmd(lambda: self.backend.zero(self.selected))
 
     def _clear(self) -> None:
-        self.backend.clear_protection(self.selected)
+        self._cmd(lambda: self.backend.clear_protection(self.selected))
 
     def _stop(self) -> None:
-        self.backend.stop_all()
+        self._cmd(lambda: self.backend.stop_all())
 
 
 class ConfigDialog(QDialog):

@@ -32,6 +32,11 @@ _STRINGS: Dict[str, Dict[str, str]] = {
     "theme.light": {"zh": "日间", "en": "Light", "ru": "Светлая"},
     "theme.to_dark": {"zh": "切换到深色模式", "en": "Switch to dark mode", "ru": "Тёмная тема"},
     "theme.to_light": {"zh": "切换到浅色模式", "en": "Switch to light mode", "ru": "Светлая тема"},
+    "stop.tip": {
+        "zh": "发送软件停止命令；不切断 12 V。紧急情况请直接关电源。",
+        "en": "Sends a software stop; does not cut 12 V. Use the power switch for emergencies.",
+        "ru": "Команда программной остановки; питание 12 В не отключается. В аварии выключите питание.",
+    },
     "link.online": {"zh": "●  已连接", "en": "●  LINK ONLINE", "ru": "●  СВЯЗЬ ЕСТЬ"},
     "link.offline": {"zh": "●  未连接", "en": "●  LINK OFFLINE", "ru": "●  СВЯЗИ НЕТ"},
     "port": {"zh": "端口", "en": "PORT", "ru": "ПОРТ"},
