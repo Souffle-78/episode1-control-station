@@ -274,6 +274,12 @@ class MainWindow(QMainWindow):
         foot_lay.addWidget(c)
         lay.addWidget(foot)
         lay.addSpacing(8)
+        sig = QLabel("SYJJ")
+        sig.setObjectName("Dim")
+        sig.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sig.setStyleSheet("font-size:11px;font-weight:700;letter-spacing:2px;")
+        sig.setToolTip(tr("app.author_tip"))
+        lay.addWidget(sig)
         ver = QLabel(tr("app.version"))
         ver.setObjectName("Dim")
         ver.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -505,10 +511,10 @@ class MainWindow(QMainWindow):
             readout.setVisible(not compact)
         canvas = getattr(self, "canvas", None)
         if canvas is not None:
-            canvas.setMinimumHeight(120 if compact else 150)
+            canvas.setMinimumHeight(150 if compact else 150)
         log = getattr(self, "log", None)
         if log is not None:
-            log.setMinimumHeight(120 if compact else 150)
+            log.setMinimumHeight(150 if compact else 150)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)

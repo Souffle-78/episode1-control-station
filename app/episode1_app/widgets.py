@@ -169,7 +169,7 @@ class JointCard(QFrame):
         self._root.setContentsMargins(12, 8, 12, 8) if compact else self._root.setContentsMargins(15, 12, 15, 12)
         self._root.setSpacing(3 if compact else 6)
         if compact:
-            self.setFixedHeight(104)
+            self.setFixedHeight(96)
         else:
             self.setMinimumHeight(126)
             self.setMaximumHeight(16777215)
@@ -281,13 +281,10 @@ class ArmCanvas(QWidget):
         p.setPen(QPen(QColor(C["line"]), 1))
         p.drawLine(24, h - 18, w - 24, h - 18)
 
-        cx = w * 0.38
-        base_y = h - 24
-        base_h = min(30.0, h * 0.19)
-        shoulder = QPointF(cx, base_y - base_h)
-        upper_len = min(54.0, h * 0.36)
+        base_h = 34.0
+        upper_len = 54.0
         short_len = 16.0
-        forearm_len = min(112.0, w * 0.20)
+        forearm_len = 112.0
         wrist_len = 26.0
 
         a1 = math.radians(self._angles[0])
@@ -299,41 +296,63 @@ class ArmCanvas(QWidget):
         th_short = th_upper + a3
         th_forearm = th_short + a4 + math.pi / 2.0
 
-        def step(pt: QPointF, ang: float, length: float) -> QPointF:
-            return QPointF(pt.x() + math.sin(ang) * length * proj,
-                           pt.y() - math.cos(ang) * length)
+        def step(pt: tuple[float, float], ang: float, length: float) -> tuple[float, float]:
+            return (pt[0] + math.sin(ang) * length * proj,
+                    pt[1] - math.cos(ang) * length)
 
+        shoulder = (0.0, -base_h)
         elbow = step(shoulder, th_upper, upper_len)
         j4 = step(elbow, th_short, short_len)
         wrist = step(j4, th_forearm, forearm_len)
         tcp = step(wrist, th_forearm, wrist_len)
 
+        # Fit the whole arm, including the base, into the widget.  This keeps
+        # the drawing inside the panel at every joint angle instead of using
+        # fixed pixel lengths that clip when the arm swings out.
+        xs = [shoulder[0], elbow[0], j4[0], wrist[0], tcp[0], -51.0, 51.0]
+        ys = [shoulder[1], elbow[1], j4[1], wrist[1], tcp[1], -base_h, 7.0]
+        pad_x = 12.0
+        pad_top = 30.0
+        pad_bottom = 20.0
+        bw = max(1.0, max(xs) - min(xs))
+        bh = max(1.0, max(ys) - min(ys))
+        scale = min((w - 2 * pad_x) / bw, (h - pad_top - pad_bottom) / bh, 1.0)
+        scale = max(0.28, scale)
+        tx = w / 2.0 - (min(xs) + max(xs)) / 2.0 * scale
+        ty = h - pad_bottom - max(ys) * scale
+
+        def T(pt: tuple[float, float]) -> QPointF:
+            return QPointF(tx + pt[0] * scale, ty + pt[1] * scale)
+
         # base
         p.setPen(QPen(QColor(C["line"]), 1))
         p.setBrush(QColor(C["panel"]))
-        p.drawRoundedRect(QRectF(cx - 44, base_y - base_h, 88, base_h), 6, 6)
+        base_rect = QRectF(T((-44.0, -base_h)), T((44.0, 0.0)))
+        p.drawRoundedRect(base_rect, 6, 6)
         p.setBrush(QColor(C["line"]))
-        p.drawRoundedRect(QRectF(cx - 51, base_y - 7, 102, 11), 3, 3)
+        p.drawRoundedRect(QRectF(T((-51.0, -7.0)), T((51.0, 4.0))), 3, 3)
         p.setBrush(QColor(C["line_soft"]))
-        p.drawRoundedRect(QRectF(cx - 38, base_y - base_h + 3, 76, 8), 3, 3)
+        p.drawRoundedRect(QRectF(T((-38.0, -base_h + 3.0)), T((38.0, -base_h + 11.0))), 3, 3)
 
-        def link(a: QPointF, b: QPointF, outer: float, inner: float, col_out: str, col_in: str) -> None:
-            p.setPen(QPen(QColor(col_out), outer, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            p.drawLine(a, b)
-            p.setPen(QPen(QColor(col_in), inner, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            p.drawLine(a, b)
+        def link(a: tuple[float, float], b: tuple[float, float], outer: float, inner: float) -> None:
+            p.setPen(QPen(QColor(C["green_dim"]), max(7.0, outer * scale),
+                          Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawLine(T(a), T(b))
+            p.setPen(QPen(QColor(C["green"]), max(4.0, inner * scale),
+                          Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawLine(T(a), T(b))
 
-        link(shoulder, elbow, 24, 14, C["green_dim"], C["green"])
-        link(elbow, j4, 18, 10, C["green_dim"], C["green"])
-        link(j4, wrist, 22, 12, C["green_dim"], C["green"])
-        link(wrist, tcp, 16, 8, C["green_dim"], C["green"])
+        link(shoulder, elbow, 24, 14)
+        link(elbow, j4, 18, 10)
+        link(j4, wrist, 22, 12)
+        link(wrist, tcp, 16, 8)
 
         joints = [
-            (QPointF(cx, base_y - 4), "J1", "left"),
-            (shoulder, "J2", "left"),
-            (elbow, "J3", "left"),
-            (j4, "J4", "below"),
-            (wrist, "J5/J6", "above"),
+            (T((0.0, -4.0)), "J1", "left"),
+            (T(shoulder), "J2", "left"),
+            (T(elbow), "J3", "left"),
+            (T(j4), "J4", "below"),
+            (T(wrist), "J5/J6", "above"),
         ]
         for pt, label, side in joints:
             p.setBrush(QColor(C["panel_2"]))
@@ -341,17 +360,18 @@ class ArmCanvas(QWidget):
             p.drawEllipse(pt, 5, 5)
             p.setPen(QPen(QColor(C["muted"]), 1))
             if side == "left":
-                p.drawText(QPointF(pt.x() - 28, pt.y() + 4), label)
+                p.drawText(QPointF(max(2.0, pt.x() - 30), pt.y() + 4), label)
             elif side == "below":
-                p.drawText(QPointF(pt.x() - 8, pt.y() - 8), label)
+                p.drawText(QPointF(max(2.0, pt.x() - 8), max(14.0, pt.y() - 8)), label)
             else:
-                p.drawText(QPointF(pt.x() - 16, pt.y() - 10), label)
+                p.drawText(QPointF(min(pt.x() - 16, w - 46), max(14.0, pt.y() - 10)), label)
 
+        tcp_pt = T(tcp)
         p.setPen(QPen(QColor(C["green"]), 1, Qt.PenStyle.DashLine))
-        p.drawLine(tcp.x() - 6, tcp.y(), tcp.x() + 6, tcp.y())
-        p.drawLine(tcp.x(), tcp.y() - 6, tcp.x(), tcp.y() + 6)
+        p.drawLine(tcp_pt.x() - 6, tcp_pt.y(), tcp_pt.x() + 6, tcp_pt.y())
+        p.drawLine(tcp_pt.x(), tcp_pt.y() - 6, tcp_pt.x(), tcp_pt.y() + 6)
         p.setPen(QPen(QColor(C["green"]), 1))
-        p.drawText(QPointF(tcp.x() + 8, tcp.y() + 4), "TCP")
+        p.drawText(QPointF(min(tcp_pt.x() + 8, w - 34), tcp_pt.y() + 4), "TCP")
 
         p.setPen(QPen(QColor(C["muted"]), 1))
         p.drawText(24, 24, tr("bottom.illustrative"))
@@ -359,7 +379,7 @@ class ArmCanvas(QWidget):
                    f"J2 {self._angles[1]:+.1f}°  J3 {self._angles[2]:+.1f}°")
         if self._moving:
             p.setPen(QPen(QColor(C["green"]), 2))
-            p.drawEllipse(shoulder, 10, 10)
+            p.drawEllipse(T(shoulder), 10, 10)
 
     def sizeHint(self):  # noqa: N802
         return self.minimumSize()

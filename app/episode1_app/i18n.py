@@ -21,6 +21,7 @@ _STRINGS: Dict[str, Dict[str, str]] = {
         "en": "ARM CONTROL STATION  /  TOMSK STATE UNIVERSITY 2026",
         "ru": "СТАНЦИЯ УПРАВЛЕНИЯ РУКОЙ  /  ТГУ 2026",
     },
+    "app.author_tip": {"zh": "作者：SYJJ", "en": "Author: SYJJ", "ru": "Автор: SYJJ"},
     "app.version": {
         "zh": "正式版 1.0.0  ·  桌面端",
         "en": "RELEASE 1.0.0  ·  DESKTOP",
