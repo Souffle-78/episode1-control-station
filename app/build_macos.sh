@@ -34,6 +34,7 @@ rm -rf build/Episode1 dist/Episode1.app dist/Episode1-macOS-*.zip
   --hidden-import x42s_stepper \
   --hidden-import can \
   --hidden-import serial \
+  --collect-submodules episode1_app \
   main.py
 
 # Ad-hoc signature: works on this Mac. For distribution, replace "-" with a

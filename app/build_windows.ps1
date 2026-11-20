@@ -29,6 +29,7 @@ if (Test-Path "dist\Episode1-Windows-x64.zip") { Remove-Item -Force "dist\Episod
   --hidden-import x42s_stepper `
   --hidden-import can `
   --hidden-import serial `
+  --collect-submodules episode1_app `
   main.py
 
 Compress-Archive -Path "dist\Episode1\*" -DestinationPath "dist\Episode1-Windows-x64.zip" -Force

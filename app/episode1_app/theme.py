@@ -296,6 +296,30 @@ QCheckBox::indicator:checked {{
     background: {C['green']};
     border-color: {C['green']};
 }}
+QTableWidget {{
+    background: #0A1016;
+    alternate-background-color: #0D151D;
+    color: {C['text']};
+    gridline-color: #1A2A37;
+    border: 1px solid {C['line']};
+    border-radius: 8px;
+    selection-background-color: #12382A;
+    selection-color: {C['text']};
+}}
+QHeaderView::section {{
+    background: #111B25;
+    color: {C['muted']};
+    border: none;
+    border-right: 1px solid {C['line']};
+    border-bottom: 1px solid {C['line']};
+    padding: 7px 6px;
+    font-size: 10px;
+    font-weight: 700;
+}}
+QTableCornerButton::section {{
+    background: #111B25;
+    border: none;
+}}
 QPlainTextEdit {{
     background: #0A1016;
     border: 1px solid {C['line']};

@@ -58,6 +58,7 @@ class MainWindow(QMainWindow):
         self._nav_keys: list[str] = []
         self.page_key = "overview"
         self._last_port = self.settings.value("last_port", "DEMO")
+        self._log_lines: list[str] = []
 
         self.setObjectName("Root")
         self.resize(1440, 900)
@@ -468,13 +469,6 @@ class MainWindow(QMainWindow):
         self._build_ui()
 
     def _nav_clicked(self, key: str) -> None:
-        if key == "fk":
-            try:
-                from .kinematics_page import KinematicsDialog
-                KinematicsDialog(self).exec()
-            except Exception as exc:
-                self._on_log("error", f"FK/IK: {exc}")
-            return
         self.page_key = key
         for k, b in zip(self._nav_keys, self._nav_buttons):
             active = k == key
@@ -483,6 +477,29 @@ class MainWindow(QMainWindow):
             b.style().polish(b)
         self.page_title.setText(tr(f"page.{key}.title"))
         self.page_sub.setText(tr(f"page.{key}.sub"))
+        try:
+            if key == "fk":
+                from .kinematics_page import KinematicsDialog
+                dialog = KinematicsDialog(self)
+                dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+                dialog.exec()
+            elif key == "joint":
+                from .dialogs import JointControlDialog
+                dialog = JointControlDialog(self.backend, self)
+                dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+                dialog.exec()
+            elif key == "config":
+                from .dialogs import ConfigDialog
+                dialog = ConfigDialog(self.backend, self)
+                dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+                dialog.exec()
+            elif key == "log":
+                from .dialogs import LogDialog
+                dialog = LogDialog(list(self._log_lines), self)
+                dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+                dialog.exec()
+        except Exception as exc:
+            self._on_log("error", f"{key}: {exc}")
 
     # ------------------------------------------------------------- actions
     def _toggle_connection(self) -> None:
@@ -663,6 +680,7 @@ class MainWindow(QMainWindow):
                 self._on_log("error", str(exc))
 
     def _on_log(self, level: str, message: str) -> None:
+        self._log_lines.append(str(message))
         if hasattr(self, "log"):
             self.log.append(level, message)
 

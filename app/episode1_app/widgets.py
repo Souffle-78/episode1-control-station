@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import math
+import math
 from typing import Optional
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
@@ -226,7 +227,11 @@ class MetricCard(QFrame):
 
 
 class ArmCanvas(QWidget):
-    """Schematic EPISODE1 zero-pose side view (not a live FK plot)."""
+    """Live schematic side view driven by the six software joint angles.
+
+    Zero pose matches the CAD pose: vertical upper arm, horizontal forearm.
+    It is a schematic, not a calibrated FK projection.
+    """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -244,91 +249,92 @@ class ArmCanvas(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
         p.fillRect(self.rect(), QColor(C["panel_2"]))
-        # dot grid
         p.setPen(QPen(QColor("#182633"), 1))
         for x in range(20, w, 24):
             for y in range(18, h, 24):
                 p.drawPoint(x, y)
-
-        # ground
         p.setPen(QPen(QColor("#243646"), 1))
         p.drawLine(24, h - 18, w - 24, h - 18)
 
-        # CAD zero-pose side view: base -> vertical upper arm -> short 56 mm
-        # link -> horizontal forearm -> 55 mm wrist/TCP.  This is a schematic,
-        # deliberately matching the EPISODE1 zero pose rather than live FK.
         cx = w * 0.38
-        base_y = h - 26
-        base_h = min(44.0, h * 0.26)
-        shoulder_y = base_y - base_h
-        j4_y = max(30.0, h * 0.18)
-        elbow_y = j4_y + 18.0
-        forearm = min(160.0, w * 0.26)
-        wrist_x = cx + forearm
-        tcp_x = min(w - 32.0, wrist_x + 38.0)
+        base_y = h - 24
+        base_h = min(30.0, h * 0.19)
+        shoulder = QPointF(cx, base_y - base_h)
+        upper_len = min(54.0, h * 0.36)
+        short_len = 16.0
+        forearm_len = min(112.0, w * 0.20)
+        wrist_len = 26.0
 
-        def capsule(x1, y1, x2, y2, thick, color):
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(color))
-            if abs(x2 - x1) >= abs(y2 - y1):
-                p.drawRoundedRect(QRectF(min(x1, x2), y1 - thick / 2,
-                                        abs(x2 - x1), thick), thick / 2, thick / 2)
-            else:
-                p.drawRoundedRect(QRectF(x1 - thick / 2, min(y1, y2),
-                                        thick, abs(y2 - y1)), thick / 2, thick / 2)
+        a1 = math.radians(self._angles[0])
+        a2 = math.radians(-self._angles[1])
+        a3 = math.radians(-self._angles[2])
+        a4 = math.radians(-self._angles[3])
+        proj = math.cos(a1)
+        th_upper = a2
+        th_short = th_upper + a3
+        th_forearm = th_short + a4 + math.pi / 2.0
+
+        def step(pt: QPointF, ang: float, length: float) -> QPointF:
+            return QPointF(pt.x() + math.sin(ang) * length * proj,
+                           pt.y() - math.cos(ang) * length)
+
+        elbow = step(shoulder, th_upper, upper_len)
+        j4 = step(elbow, th_short, short_len)
+        wrist = step(j4, th_forearm, forearm_len)
+        tcp = step(wrist, th_forearm, wrist_len)
 
         # base
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor("#172531"))
-        p.drawRoundedRect(QRectF(cx - 48, base_y - base_h, 96, base_h), 7, 7)
+        p.drawRoundedRect(QRectF(cx - 44, base_y - base_h, 88, base_h), 6, 6)
         p.setBrush(QColor("#0C141B"))
-        p.drawRoundedRect(QRectF(cx - 55, base_y - 7, 110, 11), 3, 3)
+        p.drawRoundedRect(QRectF(cx - 51, base_y - 7, 102, 11), 3, 3)
         p.setBrush(QColor("#1E3444"))
-        p.drawRoundedRect(QRectF(cx - 42, base_y - base_h + 4, 84, 9), 4, 4)
+        p.drawRoundedRect(QRectF(cx - 38, base_y - base_h + 3, 76, 8), 3, 3)
 
-        # links
-        capsule(cx, shoulder_y, cx, elbow_y, 27, "#233B4D")
-        capsule(cx, shoulder_y, cx, elbow_y, 17, "#4F8090")
-        capsule(cx, elbow_y, cx, j4_y, 18, "#28495B")
-        capsule(cx, j4_y, wrist_x, j4_y, 26, "#28495B")
-        capsule(cx, j4_y, wrist_x, j4_y, 13, "#5D96A2")
-        capsule(wrist_x, j4_y, tcp_x, j4_y, 20, "#2F5C6A")
-        capsule(wrist_x, j4_y, tcp_x, j4_y, 9, "#76B6B4")
+        def link(a: QPointF, b: QPointF, outer: float, inner: float, col_out: str, col_in: str) -> None:
+            p.setPen(QPen(QColor(col_out), outer, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawLine(a, b)
+            p.setPen(QPen(QColor(col_in), inner, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawLine(a, b)
 
-        # joint markers
+        link(shoulder, elbow, 24, 14, "#233B4D", "#4F8090")
+        link(elbow, j4, 18, 10, "#28495B", "#5D96A2")
+        link(j4, wrist, 22, 12, "#28495B", "#5D96A2")
+        link(wrist, tcp, 16, 8, "#2F5C6A", "#76B6B4")
+
         joints = [
-            ((cx, base_y - 4), "J1"),
-            ((cx, shoulder_y), "J2"),
-            ((cx, elbow_y), "J3"),
-            ((cx, j4_y), "J4"),
-            ((wrist_x, j4_y), "J5/J6"),
+            (QPointF(cx, base_y - 4), "J1", "left"),
+            (shoulder, "J2", "left"),
+            (elbow, "J3", "left"),
+            (j4, "J4", "below"),
+            (wrist, "J5/J6", "above"),
         ]
-        for (x, y), label in joints:
+        for pt, label, side in joints:
             p.setBrush(QColor(C["panel_2"]))
             p.setPen(QPen(QColor(C["blue"]), 2))
-            p.drawEllipse(QPointF(x, y), 6, 6)
+            p.drawEllipse(pt, 5, 5)
             p.setPen(QPen(QColor(C["muted"]), 1))
-            if label == "J5/J6":
-                p.drawText(QPointF(x - 18, y - 10), label)
-            elif label in ("J1", "J2", "J3"):
-                p.drawText(QPointF(x - 30, y + 4), label)
+            if side == "left":
+                p.drawText(QPointF(pt.x() - 28, pt.y() + 4), label)
+            elif side == "below":
+                p.drawText(QPointF(pt.x() - 8, pt.y() - 8), label)
             else:
-                p.drawText(QPointF(x - 26, y - 8), label)
+                p.drawText(QPointF(pt.x() - 16, pt.y() - 10), label)
 
-        # TCP crosshair
         p.setPen(QPen(QColor(C["green"]), 1, Qt.PenStyle.DashLine))
-        p.drawLine(tcp_x - 7, j4_y, tcp_x + 7, j4_y)
-        p.drawLine(tcp_x, j4_y - 7, tcp_x, j4_y + 7)
+        p.drawLine(tcp.x() - 6, tcp.y(), tcp.x() + 6, tcp.y())
+        p.drawLine(tcp.x(), tcp.y() - 6, tcp.x(), tcp.y() + 6)
         p.setPen(QPen(QColor(C["green"]), 1))
-        p.drawText(QPointF(tcp_x + 9, j4_y + 4), "TCP")
+        p.drawText(QPointF(tcp.x() + 8, tcp.y() + 4), "TCP")
 
-        # labels
         p.setPen(QPen(QColor(C["muted"]), 1))
         p.drawText(24, 24, tr("bottom.illustrative"))
-        p.drawText(QRectF(w - 240, 16, 220, 20), Qt.AlignmentFlag.AlignRight, tr("bottom.projection"))
+        p.drawText(QRectF(w - 250, 16, 230, 20), Qt.AlignmentFlag.AlignRight,
+                   f"J2 {self._angles[1]:+.1f}°  J3 {self._angles[2]:+.1f}°")
         if self._moving:
             p.setPen(QPen(QColor(C["green"]), 2))
-            p.drawEllipse(QPointF(cx, shoulder_y), 12, 12)
+            p.drawEllipse(shoulder, 10, 10)
 
     def sizeHint(self):  # noqa: N802
         return self.minimumSize()
