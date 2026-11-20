@@ -29,6 +29,13 @@ jobs:
       - name: Build exe
         shell: pwsh
         run: ./build_windows.ps1
+      - name: Smoke test exe
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          & .\dist\Episode1\Episode1.exe --screenshot dist\smoke.png --size 1440x900
+          if (!(Test-Path dist\smoke.png)) { throw "Windows exe did not produce a screenshot" }
+          Get-Item dist\smoke.png | Format-List
       - uses: actions/upload-artifact@v4
         with:
           name: Episode1-Windows-x64
