@@ -8,6 +8,7 @@
 ## 已实现
 
 - 三语切换：中文 / English / Русский，重启后记住上次语言
+- 浅色 / 深色双主题：顶部“夜间 / 日间”切换，重启后记住上次主题；默认浅色
 - Demo 模式：无硬件也能看完整界面、动效和日志
 - 真实 SLCAN 后端：扫描 ID 1–6、状态轮询、使能/失能、点动、绝对角度、六轴同步、停止、清保护、设零点
 - 安全约束：12–32 V 检查、软限位、未 zero 拒绝运动、六轴缺一不连接
@@ -32,12 +33,13 @@ macOS 没有系统 PySide6 时，`run.sh` 会自动使用 FreeCAD 自带的 Pyth
 ./run.sh --demo
 ```
 
-生成三语预览图：
+生成三语/双主题预览图：
 
 ```bash
-QT_QPA_PLATFORM=offscreen ./run.sh --screenshot docs/ui_preview_zh.png --size 1440x900
-EPISODE1_LANG=en QT_QPA_PLATFORM=offscreen ./run.sh --screenshot docs/ui_preview_en.png
-EPISODE1_LANG=ru QT_QPA_PLATFORM=offscreen ./run.sh --screenshot docs/ui_preview_ru.png
+QT_QPA_PLATFORM=offscreen EPISODE1_THEME=light ./run.sh --screenshot docs/ui_preview_zh.png --size 1440x900
+EPISODE1_LANG=en QT_QPA_PLATFORM=offscreen EPISODE1_THEME=light ./run.sh --screenshot docs/ui_preview_en.png
+EPISODE1_LANG=ru QT_QPA_PLATFORM=offscreen EPISODE1_THEME=light ./run.sh --screenshot docs/ui_preview_ru.png
+QT_QPA_PLATFORM=offscreen EPISODE1_THEME=dark ./run.sh --screenshot docs/ui_preview_dark.png
 ```
 
 ## 连接真实机械臂
@@ -94,7 +96,7 @@ app/
 │   ├── i18n.py                   # zh/en/ru 文案与切换
 │   ├── models.py                 # JointState / Snapshot
 │   ├── backend.py                # DemoBackend / SlcanBackend
-│   ├── theme.py                  # 深色工业风
+│   ├── theme.py                  # 浅色/深色主题与 Qt 样式
 │   ├── widgets.py                # JointCard / MetricCard / ArmCanvas / LogView
 │   ├── dialogs.py                # 关节控制 / 配置 / 日志窗口
 │   ├── kinematics_page.py        # FK/IK 工作台

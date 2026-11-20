@@ -11,6 +11,7 @@ from typing import Dict, Optional
 
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDoubleSpinBox,
     QFrame,
@@ -28,7 +29,7 @@ from PySide6.QtWidgets import (
 from .backend import BackendBase, DemoBackend, SlcanBackend
 from .i18n import LANGUAGES, set_language, tr
 from .models import Snapshot, STATUS_PROTECTED
-from .theme import C
+from .theme import C, apply_theme
 from .widgets import ArmCanvas, JointCard, LogView, MetricCard
 
 NAV_ITEMS = (
@@ -59,6 +60,14 @@ class MainWindow(QMainWindow):
         self.page_key = "overview"
         self._last_port = self.settings.value("last_port", "DEMO")
         self._log_lines: list[str] = []
+        self._log_entries: list[tuple[str, str]] = []
+        mode = str(os.environ.get("EPISODE1_THEME") or self.settings.value("theme", "light")).lower()
+        if mode not in ("light", "dark"):
+            mode = "light"
+        self._theme_mode = mode
+        app = QApplication.instance()
+        if app is not None:
+            apply_theme(app, mode)
 
         self.setObjectName("Root")
         self.resize(1440, 900)
@@ -130,7 +139,8 @@ class MainWindow(QMainWindow):
         self._on_connection(self.backend.connected)
         if self.last_snapshot is not None:
             self._on_snapshot(self.last_snapshot)
-        self._append_welcome()
+        if not self._log_entries:
+            self._append_welcome()
 
     def _build_topbar(self) -> QWidget:
         bar = QFrame()
@@ -165,6 +175,15 @@ class MainWindow(QMainWindow):
             f"color:{C['red']};font-size:10px;font-weight:700;letter-spacing:1px;"
         )
         lay.addWidget(self.link_state)
+
+        self.theme_btn = QPushButton(
+            tr("theme.dark") if self._theme_mode == "light" else tr("theme.light")
+        )
+        self.theme_btn.setObjectName("Ghost")
+        self.theme_btn.setFixedWidth(72)
+        self.theme_btn.setToolTip(tr("theme.to_dark") if self._theme_mode == "light" else tr("theme.to_light"))
+        self.theme_btn.clicked.connect(self._toggle_theme)
+        lay.addWidget(self.theme_btn)
 
         self.lang_combo = QComboBox()
         self.lang_combo.setFixedWidth(88)
@@ -266,7 +285,7 @@ class MainWindow(QMainWindow):
 
         self.axis_pill = QLabel(tr("axes.offline"))
         self.axis_pill.setStyleSheet(
-            f"color:{C['red']};background:{C['red_dim']};border:1px solid #6B2430;"
+            f"color:{C['red']};background:{C['red_dim']};border:1px solid {C['red_border']};"
             "border-radius:8px;padding:5px 10px;font-size:9px;font-weight:800;letter-spacing:0.8px;"
         )
         row.addWidget(self.axis_pill)
@@ -330,7 +349,7 @@ class MainWindow(QMainWindow):
         title.setObjectName("SectionTitle")
         self.sel_pill = QLabel("J2")
         self.sel_pill.setStyleSheet(
-            f"color:{C['blue']};background:{C['blue_dim']};border:1px solid #1D4C78;"
+            f"color:{C['blue']};background:{C['blue_dim']};border:1px solid {C['blue_border']};"
             "border-radius:6px;padding:3px 7px;font-size:9px;font-weight:800;"
         )
         top.addWidget(title)
@@ -454,9 +473,21 @@ class MainWindow(QMainWindow):
         row.addWidget(canvas_panel, 1)
 
         self.log = LogView()
+        for level, message in self._log_entries:
+            self.log.append(level, message)
         self.log.setFixedWidth(480)
         row.addWidget(self.log)
         return row
+
+    # ------------------------------------------------------------- theme
+    def _toggle_theme(self) -> None:
+        new_mode = "dark" if self._theme_mode == "light" else "light"
+        self._theme_mode = new_mode
+        self.settings.setValue("theme", new_mode)
+        app = QApplication.instance()
+        if app is not None:
+            apply_theme(app, new_mode)
+        self._build_ui()
 
     # ------------------------------------------------------------- language
     def _current_lang(self) -> str:
@@ -556,7 +587,7 @@ class MainWindow(QMainWindow):
         self.axis_pill.setStyleSheet(
             f"color:{C['green'] if connected else C['red']};"
             f"background:{C['green_dim'] if connected else C['red_dim']};"
-            f"border:1px solid {'#1B5B42' if connected else '#6B2430'};"
+            f"border:1px solid {C['green_border'] if connected else C['red_border']};"
             "border-radius:8px;padding:5px 10px;font-size:9px;font-weight:800;letter-spacing:0.8px;"
         )
         self.connect_btn.setText(tr("disconnect") if connected else tr("connect"))
@@ -703,6 +734,7 @@ class MainWindow(QMainWindow):
 
     def _on_log(self, level: str, message: str) -> None:
         self._log_lines.append(str(message))
+        self._log_entries.append((str(level), str(message)))
         if hasattr(self, "log"):
             self.log.append(level, message)
 

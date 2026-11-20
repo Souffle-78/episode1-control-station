@@ -103,7 +103,7 @@ class JointCard(QFrame):
         self.badge.setFixedSize(28, 22)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setStyleSheet(
-            f"background:{C['blue_dim']};color:{C['blue']};border:1px solid #1D4C78;"
+            f"background:{C['blue_dim']};color:{C['blue']};border:1px solid {C['blue_border']};"
             "border-radius:6px;font-size:10px;font-weight:800;"
         )
         self.name = QLabel("Base")
@@ -249,11 +249,11 @@ class ArmCanvas(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
         p.fillRect(self.rect(), QColor(C["panel_2"]))
-        p.setPen(QPen(QColor("#182633"), 1))
+        p.setPen(QPen(QColor(C["line_soft"]), 1))
         for x in range(20, w, 24):
             for y in range(18, h, 24):
                 p.drawPoint(x, y)
-        p.setPen(QPen(QColor("#243646"), 1))
+        p.setPen(QPen(QColor(C["line"]), 1))
         p.drawLine(24, h - 18, w - 24, h - 18)
 
         cx = w * 0.38
@@ -284,12 +284,12 @@ class ArmCanvas(QWidget):
         tcp = step(wrist, th_forearm, wrist_len)
 
         # base
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor("#172531"))
+        p.setPen(QPen(QColor(C["line"]), 1))
+        p.setBrush(QColor(C["panel"]))
         p.drawRoundedRect(QRectF(cx - 44, base_y - base_h, 88, base_h), 6, 6)
-        p.setBrush(QColor("#0C141B"))
+        p.setBrush(QColor(C["line"]))
         p.drawRoundedRect(QRectF(cx - 51, base_y - 7, 102, 11), 3, 3)
-        p.setBrush(QColor("#1E3444"))
+        p.setBrush(QColor(C["line_soft"]))
         p.drawRoundedRect(QRectF(cx - 38, base_y - base_h + 3, 76, 8), 3, 3)
 
         def link(a: QPointF, b: QPointF, outer: float, inner: float, col_out: str, col_in: str) -> None:
@@ -298,10 +298,10 @@ class ArmCanvas(QWidget):
             p.setPen(QPen(QColor(col_in), inner, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
             p.drawLine(a, b)
 
-        link(shoulder, elbow, 24, 14, "#233B4D", "#4F8090")
-        link(elbow, j4, 18, 10, "#28495B", "#5D96A2")
-        link(j4, wrist, 22, 12, "#28495B", "#5D96A2")
-        link(wrist, tcp, 16, 8, "#2F5C6A", "#76B6B4")
+        link(shoulder, elbow, 24, 14, C["green_dim"], C["green"])
+        link(elbow, j4, 18, 10, C["green_dim"], C["green"])
+        link(j4, wrist, 22, 12, C["green_dim"], C["green"])
+        link(wrist, tcp, 16, 8, C["green_dim"], C["green"])
 
         joints = [
             (QPointF(cx, base_y - 4), "J1", "left"),

@@ -33,6 +33,7 @@ def _spin(lo: float, hi: float, value: float, suffix: str = "") -> QDoubleSpinBo
     if suffix:
         s.setSuffix(suffix)
     s.setMinimumHeight(30)
+    s.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
     return s
 
 
