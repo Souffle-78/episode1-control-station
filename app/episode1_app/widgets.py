@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from .i18n import tr
-from .models import JointState, Snapshot, STATUS_HOLD, STATUS_MOVING, STATUS_PROTECTED, STATUS_READY
+from .models import JointState, Snapshot, STATUS_HOLD, STATUS_MOVING, STATUS_OFFLINE, STATUS_PROTECTED, STATUS_READY
 from .theme import C
 
 STATUS_KEYS = {
@@ -27,6 +27,7 @@ STATUS_KEYS = {
     STATUS_MOVING: "status.moving",
     STATUS_HOLD: "status.hold",
     STATUS_PROTECTED: "status.protected",
+    STATUS_OFFLINE: "status.offline",
 }
 
 
@@ -44,6 +45,8 @@ class StatusPill(QLabel):
             self.setObjectName("StatusError")
         elif status == STATUS_READY:
             self.setObjectName("StatusReady")
+        elif status == STATUS_OFFLINE:
+            self.setObjectName("StatusOffline")
         else:
             self.setObjectName("StatusWarn")
         self.style().unpolish(self)
@@ -83,32 +86,33 @@ class JointCard(QFrame):
     clicked = Signal(int)
     powerToggled = Signal(int, bool)
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, index: int = 1, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setObjectName("Card")
         self.setProperty("selected", False)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(142)
+        self.setMinimumHeight(126)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._index = 0
+        self._index = index
         self._enabled = False
 
         root = QVBoxLayout(self)
+        self._root = root
         root.setContentsMargins(15, 12, 15, 12)
         root.setSpacing(6)
 
         head = QHBoxLayout()
         head.setSpacing(8)
-        self.badge = QLabel("J1")
+        self.badge = QLabel(f"J{index}")
         self.badge.setFixedSize(28, 22)
         self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setStyleSheet(
             f"background:{C['blue_dim']};color:{C['blue']};border:1px solid {C['blue_border']};"
             "border-radius:6px;font-size:10px;font-weight:800;"
         )
-        self.name = QLabel("Base")
+        self.name = QLabel(tr(f"joint.{index}"))
         self.name.setObjectName("JointName")
-        self.status = StatusPill(STATUS_HOLD)
+        self.status = StatusPill(STATUS_OFFLINE)
         self.power = QLabel("OFF")
         self.power.setFixedSize(34, 20)
         self.power.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -146,13 +150,29 @@ class JointCard(QFrame):
         foot = QHBoxLayout()
         self.limits = QLabel("limits  —")
         self.limits.setObjectName("JointSub")
-        self.can = QLabel("CAN 1 · 25:1")
+        self.can = QLabel(f"CAN {index}")
         self.can.setObjectName("JointSub")
         self.can.setAlignment(Qt.AlignmentFlag.AlignRight)
         foot.addWidget(self.limits)
         foot.addStretch(1)
         foot.addWidget(self.can)
         root.addLayout(foot)
+
+    def set_offline(self) -> None:
+        self.status.set_status(STATUS_OFFLINE)
+        self.power.setText("OFF")
+
+    def set_compact(self, compact: bool) -> None:
+        """Small-window mode: hide the footer and reduce the card height."""
+        self.limits.setVisible(not compact)
+        self.can.setVisible(not compact)
+        self._root.setContentsMargins(12, 8, 12, 8) if compact else self._root.setContentsMargins(15, 12, 15, 12)
+        self._root.setSpacing(3 if compact else 6)
+        if compact:
+            self.setFixedHeight(104)
+        else:
+            self.setMinimumHeight(126)
+            self.setMaximumHeight(16777215)
 
     def set_state(self, state: JointState, selected: bool = False) -> None:
         self._index = state.index
@@ -235,9 +255,14 @@ class ArmCanvas(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setMinimumHeight(170)
+        self.setMinimumHeight(150)
         self._angles = [0.0] * 6
         self._moving = False
+
+    def set_zero(self) -> None:
+        self._angles = [0.0] * 6
+        self._moving = False
+        self.update()
 
     def set_snapshot(self, snap: Snapshot) -> None:
         self._angles = [j.angle for j in snap.joints]

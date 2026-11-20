@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -109,6 +110,7 @@ class MainWindow(QMainWindow):
             old.deleteLater()
         self.cards.clear()
         self._nav_buttons.clear()
+        self._compact = False
         self._nav_keys.clear()
 
         self.setWindowTitle(tr("app.title"))
@@ -126,6 +128,8 @@ class MainWindow(QMainWindow):
         body.addWidget(self._build_sidebar())
 
         content = QWidget()
+        content.setObjectName("Content")
+        content.setMinimumSize(980, 720)
         content_lay = QVBoxLayout(content)
         content_lay.setContentsMargins(22, 16, 22, 18)
         content_lay.setSpacing(12)
@@ -133,7 +137,13 @@ class MainWindow(QMainWindow):
         content_lay.addLayout(self._build_metrics())
         content_lay.addLayout(self._build_main_row(), 1)
         content_lay.addLayout(self._build_bottom_row())
-        body.addWidget(content, 1)
+        scroll = QScrollArea()
+        scroll.setObjectName("ContentScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(content)
+        body.addWidget(scroll, 1)
         outer.addLayout(body, 1)
 
         self._on_connection(self.backend.connected)
@@ -141,6 +151,7 @@ class MainWindow(QMainWindow):
             self._on_snapshot(self.last_snapshot)
         if not self._log_entries:
             self._append_welcome()
+        self._set_compact(self.height() < 920)
 
     def _build_topbar(self) -> QWidget:
         bar = QFrame()
@@ -325,7 +336,7 @@ class MainWindow(QMainWindow):
         grid = QGridLayout()
         grid.setSpacing(9)
         for i in range(6):
-            card = JointCard()
+            card = JointCard(i + 1)
             card.clicked.connect(self._select_joint)
             card.powerToggled.connect(self._toggle_joint_power)
             self.cards[i + 1] = card
@@ -438,7 +449,8 @@ class MainWindow(QMainWindow):
         lay.addWidget(self.enable_btn)
 
         lay.addStretch(1)
-        note = QLabel(tr("note.safety"))
+        self.command_note = QLabel(tr("note.safety"))
+        note = self.command_note
         note.setWordWrap(True)
         note.setObjectName("Dim")
         note.setStyleSheet("font-size:8.5px;line-height:1.35;")
@@ -478,6 +490,29 @@ class MainWindow(QMainWindow):
         self.log.setFixedWidth(480)
         row.addWidget(self.log)
         return row
+
+    def _set_compact(self, compact: bool) -> None:
+        if compact == getattr(self, "_compact", False):
+            return
+        self._compact = compact
+        for card in self.cards.values():
+            card.set_compact(compact)
+        note = getattr(self, "command_note", None)
+        if note is not None:
+            note.setVisible(not compact)
+        readout = getattr(self, "sel_target_read", None)
+        if readout is not None:
+            readout.setVisible(not compact)
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None:
+            canvas.setMinimumHeight(120 if compact else 150)
+        log = getattr(self, "log", None)
+        if log is not None:
+            log.setMinimumHeight(120 if compact else 150)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._set_compact(self.height() < 920)
 
     # ------------------------------------------------------------- theme
     def _toggle_theme(self) -> None:
@@ -594,8 +629,14 @@ class MainWindow(QMainWindow):
         self._update_command_sensitivity(connected)
         if not connected:
             self.last_snapshot = None
+            self.m_voltage.set_value("—", tr("metric.voltage.note"))
+            self.m_current.set_value("—", tr("metric.current.note"))
+            self.m_temp.set_value("—", tr("metric.temp.note"))
+            self.m_latency.set_value("—", tr("metric.loop.note"))
+            self.canvas.set_zero()
             for card in self.cards.values():
                 card.setEnabled(False)
+                card.set_offline()
                 card.setProperty("selected", False)
                 card.style().unpolish(card)
                 card.style().polish(card)
@@ -613,6 +654,8 @@ class MainWindow(QMainWindow):
             w.setEnabled(connected)
 
     def _on_snapshot(self, snap: Snapshot) -> None:
+        if not self.backend.connected:
+            return
         self.last_snapshot = snap
         for j in snap.joints:
             card = self.cards.get(j.index)

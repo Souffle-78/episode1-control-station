@@ -55,7 +55,7 @@ class JointControlDialog(QDialog):
         grid = QGridLayout()
         grid.setSpacing(10)
         for i in range(6):
-            card = JointCard()
+            card = JointCard(i + 1)
             card.clicked.connect(self._select)
             card.powerToggled.connect(self._toggle)
             self.cards[i + 1] = card

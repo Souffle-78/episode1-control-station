@@ -75,6 +75,7 @@ python armctl.py move-all --iface slcan --channel /dev/cu.usbmodem1101 \
 ![桌面上位机](app/docs/ui_preview_zh.png)
 
 - 源码与说明：[app/README.zh.md](app/README.zh.md)
+- 自适应布局：高度低于 920 px 自动紧凑模式，窗口最小 1180×760；内容过多时可滚动
 - 浅色 / 深色双主题：顶部“夜间 / 日间”一键切换，记住上次选择；默认浅色
 - 实时姿态图：零位与 CAD 一致，随 J1–J6 软件角度和 Move/Jog 指令变化
 - 侧边栏：关节控制（六轴大面板）、正逆运动学、配置（只读限位/减速比表）、事件日志（复制/导出）

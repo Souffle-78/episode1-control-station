@@ -85,6 +85,7 @@ QLabel#AngleUnit {{ color: {C['muted']}; font-size: 12px; }}
 QLabel#StatusReady {{ color: {C['green']}; background: {C['green_dim']}; border: 1px solid {C['green_border']}; border-radius: 8px; padding: 3px 9px; font-size: 9px; font-weight: 700; }}
 QLabel#StatusMove {{ color: {C['blue']}; background: {C['blue_dim']}; border: 1px solid {C['blue_border']}; border-radius: 8px; padding: 3px 9px; font-size: 9px; font-weight: 700; }}
 QLabel#StatusWarn {{ color: {C['amber']}; background: {C['amber_dim']}; border: 1px solid {C['amber_border']}; border-radius: 8px; padding: 3px 9px; font-size: 9px; font-weight: 700; }}
+QLabel#StatusOffline {{ color: {C['muted']}; background: {C['line_soft']}; border: 1px solid {C['line']}; border-radius: 8px; padding: 3px 9px; font-size: 9px; font-weight: 700; }}
 QLabel#StatusError {{ color: {C['red']}; background: {C['red_dim']}; border: 1px solid {C['red_border']}; border-radius: 8px; padding: 3px 9px; font-size: 9px; font-weight: 700; }}
 QPushButton {{
     background: {C['panel']}; border: 1px solid {C['line']}; border-radius: 8px;
