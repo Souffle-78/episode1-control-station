@@ -13,7 +13,7 @@
 - 安全约束：12–32 V 检查、软限位、未 zero 拒绝运动、六轴缺一不连接
 - 六轴状态卡、电压/电流/温度/周期、侧视示意图、事件日志
 - FK/IK 工作台：官方 DH 模型，FK 算 TCP，数值 IK 反解关节角（离线，不直接下发运动）
-- macOS `.app` 已构建；Windows `.exe` 提供 PowerShell 脚本 + GitHub Actions
+- macOS `.app` 已构建并本机 smoke test；Windows `.exe` 已由 GitHub Actions 构建（x64）并通过 CI 启动/截图 smoke test
 
 ## 运行（源码）
 
@@ -67,7 +67,11 @@ Developer ID + notarytool。
 
 ### Windows
 
-macOS 不能交叉编译 Windows PE，所以 `.exe` 必须在 Windows 上生成：
+已生成 `dist/Episode1-Windows-x64.zip`（61 MB，x64，GitHub Actions
+`build-windows.yml` 构建，内含 `Episode1.exe`）。CI 已在 `windows-latest`
+上启动该 exe 并成功生成 1440×900 截图；未连接真实 CAN 硬件。解压后直接运行。
+
+重新构建（Windows 本机）：
 
 ```powershell
 cd app
@@ -76,8 +80,8 @@ cd app
 #       dist\Episode1-Windows-x64.zip
 ```
 
-或者把仓库推到 GitHub，手动运行 `.github/workflows/build-windows.yml`，
-下载 artifact `Episode1-Windows-x64`。macOS 对应 workflow 为
+或把仓库推到 GitHub，运行 `.github/workflows/build-windows.yml`，下载
+artifact `Episode1-Windows-x64`。macOS 对应 workflow 为
 `.github/workflows/build-macos.yml`。
 
 ## 代码结构
@@ -111,5 +115,5 @@ IK 输入目标 x/y/z + RPY，用带关节限位的阻尼最小二乘求解，�
 
 - 侧视示意图是示意，不是由 FK 实时驱动。
 - IK 结果需要人工确认软限位/碰撞后再下发；当前 UI 不自动执行。
-- Windows `.exe` 未在本机生成（无 Windows/Wine）；脚本和 CI 已准备好。
+- Windows `.exe` 已通过 CI 启动/截图测试，但未连接真实 CAN 硬件；首次运行有 SmartScreen 提示。
 - 未做代码签名/公证；对外分发前需处理 Gatekeeper / SmartScreen。

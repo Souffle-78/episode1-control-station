@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.backend = backend or DemoBackend(self)
         self.demo = demo
-        self.settings = QSettings("TPU-Robotics", "Episode1-Station")
+        self.settings = QSettings("TSU-Robotics", "Episode1-Station")
         lang = str(os.environ.get("EPISODE1_LANG") or self.settings.value("language", "zh"))
         if lang not in ("zh", "en", "ru"):
             lang = "zh"

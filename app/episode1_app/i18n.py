@@ -17,9 +17,9 @@ _STRINGS: Dict[str, Dict[str, str]] = {
         "ru": "Episode 1 · Пульт управления рукой",
     },
     "app.sub": {
-        "zh": "六轴机械臂控制站  /  托木斯克理工 2026",
-        "en": "ARM CONTROL STATION  /  TPU ROBOTICS 2026",
-        "ru": "СТАНЦИЯ УПРАВЛЕНИЯ РУКОЙ  /  ТПУ 2026",
+        "zh": "六轴机械臂控制站  /  托木斯克国立大学 2026",
+        "en": "ARM CONTROL STATION  /  TOMSK STATE UNIVERSITY 2026",
+        "ru": "СТАНЦИЯ УПРАВЛЕНИЯ РУКОЙ  /  ТГУ 2026",
     },
     "app.version": {
         "zh": "正式版 1.0.0  ·  桌面端",

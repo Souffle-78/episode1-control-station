@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     app = QApplication(sys.argv[:1])
     app.setApplicationName("Episode 1 Control Station")
-    app.setOrganizationName("TPU Robotics")
+    app.setOrganizationName("TSU Robotics")
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
     icon = base / "assets" / "icon.png"
     if icon.exists():
