@@ -6,8 +6,8 @@ from typing import List, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
-    QApplication, QDialog, QDoubleSpinBox, QFileDialog, QFrame, QGridLayout,
-    QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPlainTextEdit,
+    QApplication, QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFrame,
+    QGridLayout, QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPlainTextEdit,
     QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -122,6 +122,9 @@ class JointControlDialog(QDialog):
         sync = QPushButton(tr("action.sync"))
         sync.clicked.connect(self._open_sync)
         lay.addWidget(sync)
+        limits = QPushButton(tr("action.limits"))
+        limits.clicked.connect(self._open_limits)
+        lay.addWidget(limits)
         self.enable_btn = QPushButton(tr("action.disable"))
         self.enable_btn.clicked.connect(self._toggle_selected)
         lay.addWidget(self.enable_btn)
@@ -150,6 +153,9 @@ class JointControlDialog(QDialog):
 
     def _open_sync(self) -> None:
         SyncDialog(self.backend, self).exec()
+
+    def _open_limits(self) -> None:
+        LimitDialog(self.backend, self.selected, self).exec()
 
     def _on_snapshot(self, snap: Snapshot) -> None:
         self.snap = snap
@@ -225,6 +231,175 @@ class JointControlDialog(QDialog):
 
     def _stop(self) -> None:
         self._cmd(lambda: self.backend.stop_all())
+
+
+class LimitDialog(QDialog):
+    """Manual mechanical-limit calibration.
+
+    The user jogs with the normal low-speed buttons; this dialog deliberately
+    bypasses software-limit checks so a newly shifted zero can be re-measured.
+    """
+
+    def __init__(self, backend, index: int = 1, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.backend = backend
+        self.index = int(index)
+        self.snap: Optional[Snapshot] = backend.snapshot()
+        _style(self)
+        self.setWindowTitle(tr("limit.title"))
+        self.resize(680, 520)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(10)
+        title = QLabel(tr("limit.title"))
+        title.setObjectName("SectionTitle")
+        root.addWidget(title)
+        sub = QLabel(tr("limit.sub"))
+        sub.setObjectName("Dim")
+        sub.setWordWrap(True)
+        root.addWidget(sub)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel(tr("limit.joint")))
+        self.joint = QComboBox()
+        for i in range(1, 7):
+            self.joint.addItem(f"J{i}  {tr(f'joint.{i}')}", i)
+        self.joint.setCurrentIndex(max(0, self.index - 1))
+        self.joint.currentIndexChanged.connect(self._joint_changed)
+        row.addWidget(self.joint, 1)
+        row.addWidget(QLabel(tr("limit.current")))
+        self.current = QLabel("—")
+        self.current.setObjectName("SectionTitle")
+        row.addWidget(self.current)
+        root.addLayout(row)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        grid.addWidget(QLabel(tr("limit.min")), 0, 0)
+        grid.addWidget(QLabel(tr("limit.max")), 0, 1)
+        self.min_spin = QDoubleSpinBox()
+        self.max_spin = QDoubleSpinBox()
+        for w in (self.min_spin, self.max_spin):
+            w.setRange(-10000.0, 10000.0)
+            w.setDecimals(2)
+            w.setSuffix(" °")
+            w.setMinimumHeight(34)
+            w.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        grid.addWidget(self.min_spin, 1, 0)
+        grid.addWidget(self.max_spin, 1, 1)
+        bmin = QPushButton(tr("limit.record_min"))
+        bmax = QPushButton(tr("limit.record_max"))
+        bmin.clicked.connect(lambda: self._record_min())
+        bmax.clicked.connect(lambda: self._record_max())
+        grid.addWidget(bmin, 2, 0)
+        grid.addWidget(bmax, 2, 1)
+        root.addLayout(grid)
+
+        jogrow = QHBoxLayout()
+        for d in (-5, -1, 1, 5):
+            b = QPushButton(f"{d:+d}°")
+            b.clicked.connect(lambda _=False, delta=d: self._jog(delta))
+            jogrow.addWidget(b)
+        jogrow.addWidget(QLabel("RPM"))
+        self.rpm = QDoubleSpinBox()
+        self.rpm.setRange(0.02, 1.0)
+        self.rpm.setSingleStep(0.02)
+        self.rpm.setValue(0.10)
+        self.rpm.setDecimals(2)
+        self.rpm.setMaximumWidth(100)
+        self.rpm.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        jogrow.addWidget(self.rpm)
+        root.addLayout(jogrow)
+
+        note = QLabel(tr("limit.note"))
+        note.setObjectName("Dim")
+        note.setWordWrap(True)
+        root.addWidget(note)
+
+        actions = QHBoxLayout()
+        save = QPushButton(tr("limit.save"))
+        save.setObjectName("Primary")
+        save.clicked.connect(self._save)
+        clear = QPushButton(tr("limit.clear"))
+        clear.clicked.connect(self._clear)
+        stop = QPushButton(tr("stop_all"))
+        stop.setObjectName("Danger")
+        stop.clicked.connect(lambda: self.backend.stop_all())
+        actions.addWidget(save, 1)
+        actions.addWidget(clear)
+        actions.addWidget(stop)
+        close = QPushButton(tr("dialog.close"))
+        close.clicked.connect(self.accept)
+        actions.addWidget(close)
+        root.addLayout(actions)
+
+        self.backend.snapshotChanged.connect(self._on_snapshot)
+        self._on_snapshot(self.backend.snapshot())
+
+    def _state(self):
+        if not self.snap:
+            return None
+        return next((j for j in self.snap.joints if j.index == self.index), None)
+
+    def _joint_changed(self, *_args) -> None:
+        self.index = int(self.joint.currentData())
+        self._on_snapshot(self.snap or self.backend.snapshot())
+
+    def _on_snapshot(self, snap: Snapshot) -> None:
+        self.snap = snap
+        st = self._state()
+        if not st:
+            self.current.setText("—")
+            return
+        self.current.setText(f"{st.angle:+.2f}°")
+        # Load configured limits only when the joint changes; do not overwrite
+        # values the user is editing during jogging.
+        if not getattr(self, "_loaded", None) == self.index:
+            self._loaded = self.index
+            self.min_spin.setValue(st.min_deg)
+            self.max_spin.setValue(st.max_deg)
+
+    def _record_min(self) -> None:
+        st = self._state()
+        if st:
+            self.min_spin.setValue(st.angle)
+
+    def _record_max(self) -> None:
+        st = self._state()
+        if st:
+            self.max_spin.setValue(st.angle)
+
+    def _jog(self, delta: float) -> None:
+        if not self.backend.connected:
+            QMessageBox.warning(self, tr("limit.title"), tr("msg.connect_first"))
+            return
+        try:
+            st = self._state()
+            if st is not None and not st.enabled:
+                self.backend.set_enabled(self.index, True)
+            self.backend.jog_raw(self.index, delta, self.rpm.value())
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, tr("limit.title"), str(exc))
+
+    def _clear(self) -> None:
+        try:
+            self.backend.clear_protection(self.index)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, tr("limit.title"), str(exc))
+
+    def _save(self) -> None:
+        lo, hi = self.min_spin.value(), self.max_spin.value()
+        if lo >= hi:
+            QMessageBox.warning(self, tr("limit.title"), tr("limit.err_order"))
+            return
+        try:
+            self.backend.set_limits(self.index, lo, hi)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, tr("limit.title"), str(exc))
+            return
+        QMessageBox.information(self, tr("limit.title"), tr("limit.saved", index=self.index, lo=lo, hi=hi))
 
 
 class SyncDialog(QDialog):

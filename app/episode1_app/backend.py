@@ -6,9 +6,11 @@ touching widgets. `DemoBackend` is deliberately deterministic and hardware-free.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import random
+import shutil
 import sys
 import threading
 import time
@@ -65,6 +67,13 @@ class BackendBase(QObject):
         raise NotImplementedError
 
     def jog(self, index: int, delta_deg: float, rpm: float) -> None:
+        raise NotImplementedError
+
+    def jog_raw(self, index: int, delta_deg: float, rpm: float) -> None:
+        """Jog without soft-limit checks; only for limit calibration."""
+        raise NotImplementedError
+
+    def set_limits(self, index: int, min_deg: float, max_deg: float) -> None:
         raise NotImplementedError
 
     def move(self, index: int, angle_deg: float, rpm: float, accel: int) -> None:
@@ -221,6 +230,23 @@ class DemoBackend(BackendBase):
         )
         self.snapshotChanged.emit(self.snapshot())
 
+    def jog_raw(self, index: int, delta_deg: float, rpm: float) -> None:
+        j = self._joint(index)
+        if not j.enabled:
+            self._emit_log("warn", tr("log.needs_enable", index=index))
+            return
+        j.target = round(j.target + delta_deg, 3)
+        j.status = STATUS_MOVING
+        self._emit_log("cmd", tr("log.jog", index=index, delta=delta_deg, target=j.target, rpm=rpm))
+        self.snapshotChanged.emit(self.snapshot())
+
+    def set_limits(self, index: int, min_deg: float, max_deg: float) -> None:
+        j = self._joint(index)
+        j.min_deg = float(min_deg)
+        j.max_deg = float(max_deg)
+        self._emit_log("ok", tr("log.limits", index=index, lo=j.min_deg, hi=j.max_deg))
+        self.snapshotChanged.emit(self.snapshot())
+
     def move(self, index: int, angle_deg: float, rpm: float, accel: int) -> None:
         j = self._joint(index)
         if not self._check_limits(j, angle_deg):
@@ -289,6 +315,7 @@ class SlcanBackend(BackendBase):
         self._snapshot = Snapshot(protocol="SLCAN / 500 kbit/s")
         self._ctl = None
         self._armctl = None
+        self._config_path: Optional[Path] = None
         self._port = ""
         self._joints: List[JointState] = []
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="arm-can")
@@ -316,16 +343,22 @@ class SlcanBackend(BackendBase):
                 state_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "Episode1"
             state_dir.mkdir(parents=True, exist_ok=True)
             state_path = state_dir / ".arm_state.json"
+            config_path = state_dir / "joints.json"
+            bundled = arm_dir / "config" / "joints.json"
+            if not config_path.exists() and bundled.exists():
+                shutil.copy2(bundled, config_path)
         else:
             arm_dir = Path(__file__).resolve().parents[2] / "arm"
             state_path = arm_dir / "config" / ".arm_state.json"
+            config_path = arm_dir / "config" / "joints.json"
         if not (arm_dir / "armctl.py").exists():
             raise RuntimeError(f"找不到 armctl.py: {arm_dir}")
         if str(arm_dir) not in sys.path:
             sys.path.insert(0, str(arm_dir))
         import armctl  # local import: package only needed for hardware
 
-        cfg = armctl.load_config(arm_dir / "config" / "joints.json")
+        self._config_path = config_path
+        cfg = armctl.load_config(config_path)
         args = argparse.Namespace(
             iface="slcan", channel=port, bitrate=500000, timeout=0.5,
             state=str(state_path),
@@ -542,6 +575,51 @@ class SlcanBackend(BackendBase):
                                skip_voltage=False, allow_large=False, wait_timeout=30.0)
                 remaining -= step
         self._run(fn, tr("log.jog", index=index, delta=delta_deg, target=target, rpm=rpm))
+
+    def jog_raw(self, index: int, delta_deg: float, rpm: float) -> None:
+        if self._ctl is None:
+            raise RuntimeError(tr("msg.connect_first"))
+        cid = self._can(index)
+        j = self._ctl.cfg.by_can_id(cid)
+        target = self._ctl.state.angle(j.index) + delta_deg
+
+        def fn():
+            remaining = float(delta_deg)
+            while abs(remaining) > 1e-9:
+                step = max(-self._max_step(), min(self._max_step(), remaining))
+                self._ctl.move(cid, step, rpm=rpm, accel=1, wait=True,
+                               skip_voltage=False, allow_large=False,
+                               wait_timeout=30.0, check_limits=False)
+                remaining -= step
+        self._run(fn, tr("log.jog", index=index, delta=delta_deg, target=target, rpm=rpm))
+
+    def set_limits(self, index: int, min_deg: float, max_deg: float) -> None:
+        if self._ctl is None:
+            raise RuntimeError(tr("msg.connect_first"))
+        if min_deg >= max_deg:
+            raise ValueError("min must be smaller than max")
+        j = self._ctl.cfg.by_index(index)
+        j.min_deg = float(min_deg)
+        j.max_deg = float(max_deg)
+        for item in self._joints:
+            if item.index == index:
+                item.min_deg = float(min_deg)
+                item.max_deg = float(max_deg)
+        if self._config_path is not None:
+            data = json.loads(self._config_path.read_text(encoding="utf-8"))
+            for row in data.get("joints", []):
+                if int(row.get("joint", row.get("id", -1))) == index:
+                    row["min_deg"] = float(min_deg)
+                    row["max_deg"] = float(max_deg)
+            tmp = self._config_path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            tmp.replace(self._config_path)
+        for item in self._snapshot.joints:
+            if item.index == index:
+                item.min_deg = float(min_deg)
+                item.max_deg = float(max_deg)
+        self._emit_log("ok", tr("log.limits", index=index, lo=min_deg, hi=max_deg))
+        self.snapshotChanged.emit(self._snapshot)
 
     def move(self, index: int, angle_deg: float, rpm: float, accel: int) -> None:
         if self._ctl is None:

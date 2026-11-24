@@ -626,7 +626,7 @@ class ArmController:
     def _move_one(self, joint: Joint, delta_deg: float, rpm: float,
                   accel: int, wait: bool, sync: bool = False,
                   allow_large: bool = False, check_state: bool = True,
-                  wait_timeout: float = 60.0) -> float:
+                  wait_timeout: float = 60.0, check_limits: bool = True) -> float:
         if not 0 <= int(accel) <= 255:
             raise SafetyError("--accel 必须在 0..255 (Emm 档位)")
         if check_state:
@@ -638,7 +638,8 @@ class ArmController:
             )
         current = self.state.angle(joint.index)
         target = current + delta_deg
-        joint.check_target(target)
+        if check_limits:
+            joint.check_target(target)
         rpm = self._check_rpm(joint, rpm)
         ms = self._ms(joint.can_id)
         pulses = self._pulses(delta_deg, ms, joint.gear_ratio)
@@ -742,20 +743,21 @@ class ArmController:
 
     def move(self, can_id: int, deg: float, rpm: Optional[float], accel: int,
              wait: bool, skip_voltage: bool, allow_large: bool,
-             wait_timeout: float = 60.0) -> int:
+             wait_timeout: float = 60.0, check_limits: bool = True) -> float:
         j = self.cfg.by_can_id(can_id)
         rpm = self.cfg.default_output_rpm if rpm is None else rpm
         self._state_ready([j])
         target = self.state.angle(j.index) + deg
-        j.check_target(target)
+        if check_limits:
+            j.check_target(target)
         self._check_rpm(j, rpm)
         if abs(deg) > self.cfg.max_step_deg and not allow_large:
             raise SafetyError(f"单次运动 {deg:.2f}° 超过 {self.cfg.max_step_deg:.1f}°; 加 --allow-large")
         self._voltage_ok([can_id], skip_voltage)
         t = self._move_one(j, deg, rpm, accel, wait, allow_large=allow_large,
-                           wait_timeout=wait_timeout)
+                           wait_timeout=wait_timeout, check_limits=check_limits)
         print(f"J{j.index} 目标 {t:.3f}° 完成。")
-        return 0
+        return t
 
     def move_all(self, deltas: Sequence[float], rpm: Optional[float], accel: int,
                  wait: bool, skip_voltage: bool, allow_large: bool,
