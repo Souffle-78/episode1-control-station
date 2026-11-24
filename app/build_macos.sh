@@ -29,7 +29,7 @@ rm -rf build/Episode1 dist/Episode1.app dist/Episode1-macOS-*.zip
   --add-data "../arm/config/joints.json:arm/config" \
   --add-data "../kinematics/__init__.py:kinematics" \
   --add-data "../kinematics/episode1_model.py:kinematics" \
-  --add-data "assets/icon.png:assets" \
+  --add-data "assets:assets" \
   --additional-hooks-dir hooks \
   --collect-all numpy \
   --collect-submodules x42s_stepper \

@@ -1,6 +1,9 @@
 """Visual system for the Episode 1 control station (light + dark)."""
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 from PySide6.QtWidgets import QApplication
 
@@ -51,7 +54,26 @@ def _font_family() -> str:
     return "Sans Serif"
 
 
+def _asset_path(name: str) -> str:
+    """Find assets in source, PyInstaller onefile, and macOS .app layouts."""
+    bases: list[Path] = []
+    if hasattr(sys, "_MEIPASS"):
+        bases.append(Path(sys._MEIPASS))
+        bases.append(Path(sys._MEIPASS).parent / "Resources")
+    if getattr(sys, "frozen", False):
+        bases.append(Path(sys.executable).resolve().parent.parent / "Resources")
+    bases.append(Path(__file__).resolve().parent.parent)
+    for base in bases:
+        candidate = base / "assets" / name
+        if candidate.exists():
+            return candidate.as_posix()
+    return (bases[0] / "assets" / name).as_posix()
+
+
 def _stylesheet() -> str:
+    suffix = "dark" if MODE == "dark" else "light"
+    up_arrow = _asset_path(f"spin_up_{suffix}.png")
+    down_arrow = _asset_path(f"spin_down_{suffix}.png")
     return f"""
 * {{ outline: none; }}
 QMainWindow, QWidget#Root, QDialog#Root {{ background: {C['bg']}; color: {C['text']}; }}
@@ -118,7 +140,18 @@ QComboBox:focus, QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus {{ border
 QComboBox::drop-down {{ border: none; border-left: 1px solid {C['line']}; width: 24px; }}
 QComboBox QAbstractItemView {{ background: {C['panel']}; border: 1px solid {C['line']}; selection-background-color: {C['green_dim']}; selection-color: {C['text']}; color: {C['text']}; }}
 QDoubleSpinBox QLineEdit, QSpinBox QLineEdit {{ padding-left: 6px; background: transparent; border: none; }}
-QDoubleSpinBox::up-button, QDoubleSpinBox::down-button, QSpinBox::up-button, QSpinBox::down-button {{ width: 15px; background: {C['line_soft']}; border: none; }}
+QDoubleSpinBox::up-button, QSpinBox::up-button {{
+    subcontrol-origin: border; subcontrol-position: top right;
+    width: 18px; background: {C['line_soft']}; border-left: 1px solid {C['line']};
+    border-top-right-radius: 8px;
+}}
+QDoubleSpinBox::down-button, QSpinBox::down-button {{
+    subcontrol-origin: border; subcontrol-position: bottom right;
+    width: 18px; background: {C['line_soft']}; border-left: 1px solid {C['line']};
+    border-bottom-right-radius: 8px;
+}}
+QDoubleSpinBox::up-arrow, QSpinBox::up-arrow {{ image: url("{up_arrow}"); width: 10px; height: 10px; }}
+QDoubleSpinBox::down-arrow, QSpinBox::down-arrow {{ image: url("{down_arrow}"); width: 10px; height: 10px; }}
 QCheckBox {{ color: {C['muted']}; spacing: 7px; }}
 QCheckBox::indicator {{ width: 14px; height: 14px; border-radius: 4px; border: 1px solid {C['line']}; background: {C['input_bg']}; }}
 QCheckBox::indicator:checked {{ background: {C['green']}; border-color: {C['green']}; }}
