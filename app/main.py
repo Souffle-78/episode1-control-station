@@ -19,6 +19,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Episode 1 arm control station")
     p.add_argument("--demo", action="store_true", help="auto-connect the demo backend")
     p.add_argument("--connect-test", metavar="PORT", help="connect the real SLCAN backend and print a snapshot, then exit")
+    p.add_argument("--fk-test", action="store_true", help="construct the FK/IK dialog, print results and exit")
     p.add_argument("--screenshot", type=Path, help="render one frame to a PNG and exit")
     p.add_argument("--size", default="1440x900", help="window size for screenshot")
     return p.parse_args(argv)
@@ -34,6 +35,15 @@ def main(argv: list[str] | None = None) -> int:
     if icon.exists():
         app.setWindowIcon(QIcon(str(icon)))
     apply_theme(app)
+
+    if args.fk_test:
+        from episode1_app.kinematics_page import KinematicsDialog
+
+        d = KinematicsDialog()
+        print("FK_STATUS", d.status.text())
+        d._solve_ik()
+        print("IK_STATUS", d.status.text())
+        return 0
 
     if args.connect_test:
         from episode1_app.backend import SlcanBackend

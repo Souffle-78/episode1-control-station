@@ -25,7 +25,8 @@ if (Test-Path "dist\Episode1-Windows-x64.zip") { Remove-Item -Force "dist\Episod
   --add-data "..\kinematics\__init__.py;kinematics" `
   --add-data "..\kinematics\episode1_model.py;kinematics" `
   --add-data "assets\icon.png;assets" `
-  --hidden-import numpy `
+  --additional-hooks-dir hooks `
+  --collect-all numpy `
   --collect-submodules x42s_stepper `
   --collect-submodules can `
   --collect-submodules serial `
