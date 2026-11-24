@@ -623,7 +623,7 @@ class MainWindow(QMainWindow):
         try:
             if key == "fk":
                 from .kinematics_page import KinematicsDialog
-                dialog = KinematicsDialog(self)
+                dialog = KinematicsDialog(self, self.backend)
                 dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
                 dialog.exec()
             elif key == "joint":

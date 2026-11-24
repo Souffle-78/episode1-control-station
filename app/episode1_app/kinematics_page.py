@@ -40,8 +40,9 @@ def _spin(lo: float, hi: float, value: float, suffix: str = "") -> QDoubleSpinBo
 class KinematicsDialog(QDialog):
     """Small FK/IK workbench using the official DH model."""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, backend=None) -> None:
         super().__init__(parent)
+        self.backend = backend
         self.setObjectName("Root")
         self.setWindowTitle(tr("kin.title"))
         self.resize(980, 600)
@@ -77,11 +78,16 @@ class KinematicsDialog(QDialog):
             s = _spin(-360, 360, (0, 90, 0, 0, 0, 0)[i], " °")
             self.q_spins.append(s)
             lg.addWidget(s, i + 1, 1)
+        self.use_current_btn = QPushButton(tr("kin.use_current"))
+        self.use_current_btn.setObjectName("Ghost")
+        self.use_current_btn.setToolTip(tr("kin.use_current_tip"))
+        self.use_current_btn.clicked.connect(self._fill_current)
+        lg.addWidget(self.use_current_btn, 7, 0, 1, 2)
         self.fk_btn = QPushButton(tr("kin.fk"))
         self.fk_btn.setObjectName("Primary")
         self.fk_btn.clicked.connect(self._compute_fk)
-        lg.addWidget(self.fk_btn, 7, 0, 1, 2)
-        lg.setRowStretch(8, 1)
+        lg.addWidget(self.fk_btn, 8, 0, 1, 2)
+        lg.setRowStretch(9, 1)
         cols.addWidget(left, 1)
 
         # target pose
@@ -131,6 +137,21 @@ class KinematicsDialog(QDialog):
 
     def _q(self) -> list[float]:
         return [s.value() for s in self.q_spins]
+
+    def _fill_current(self) -> None:
+        if self.backend is None or not getattr(self.backend, "connected", False):
+            self.status.setText(tr("kin.current_err"))
+            return
+        snap = self.backend.snapshot()
+        if len(snap.joints) < 6:
+            self.status.setText(tr("kin.current_err"))
+            return
+        a = [j.angle for j in snap.joints]
+        q = [a[0], 90.0 - a[1], -a[2], a[3], -a[4], a[5]]
+        for spin, value in zip(self.q_spins, q):
+            spin.setValue(value)
+        self.status.setText(tr("kin.current_ok"))
+        self._compute_fk()
 
     def _compute_fk(self) -> None:
         try:
