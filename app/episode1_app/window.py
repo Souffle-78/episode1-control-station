@@ -7,6 +7,7 @@ and no stale English text can survive a language switch.
 from __future__ import annotations
 
 import os
+import re
 from typing import Dict, Optional
 
 from PySide6.QtCore import QSettings, Qt
@@ -31,7 +32,7 @@ from .backend import BackendBase, DemoBackend, SlcanBackend
 from .i18n import LANGUAGES, set_language, tr
 from .models import Snapshot, STATUS_PROTECTED
 from .theme import C, apply_theme
-from .widgets import ArmCanvas, JointCard, LogView, MetricCard
+from .widgets import ArmCanvas, JointCard, LogView, MetricCard, PortComboBox
 
 NAV_ITEMS = (
     ("overview", "◈", "nav.overview"),
@@ -74,6 +75,11 @@ class MainWindow(QMainWindow):
         self.resize(1440, 900)
         self.setMinimumSize(1180, 760)
         self._build_ui()
+        if str(self._last_port).strip().upper() == "DEMO":
+            seen = self._serial_ports()
+            if seen:
+                self._refresh_ports(seen[0][0])
+                self.port.setCurrentText(seen[0][0])
 
         self._attach_backend(self.backend)
         # The packaged app starts in DEMO; make it live immediately so Move/Jog
@@ -208,19 +214,17 @@ class MainWindow(QMainWindow):
         port_label = QLabel(tr("port"))
         port_label.setObjectName("SectionTitle")
         lay.addWidget(port_label)
-        self.port = QComboBox()
+        self.port = PortComboBox()
         self.port.setEditable(True)
-        ports = ["DEMO", "/dev/cu.usbmodem1101", "COM6"]
+        self.port.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         saved_port = (self._last_port or "DEMO").strip()
         if saved_port != "DEMO" and not (
             saved_port.startswith("/dev/") or saved_port.upper().startswith("COM")
         ):
             saved_port = "DEMO"
         self._last_port = saved_port
-        if saved_port not in ports:
-            ports.insert(0, saved_port)
-        self.port.addItems(ports)
-        self.port.setCurrentText(saved_port)
+        self.port.refreshRequested.connect(self._refresh_ports)
+        self._refresh_ports(saved_port)
         self.port.setMinimumWidth(190)
         lay.addWidget(self.port)
 
@@ -558,6 +562,45 @@ class MainWindow(QMainWindow):
     def _remember_port(self, text: str) -> None:
         self._last_port = text.strip()
         self.settings.setValue("last_port", self._last_port)
+
+    @staticmethod
+    def _serial_ports() -> list[tuple[str, str]]:
+        """Return real serial-port candidates; DEMO is added separately."""
+        try:
+            from serial.tools import list_ports
+        except Exception:
+            return []
+        found: list[tuple[str, str]] = []
+        for p in list_ports.comports():
+            dev = (p.device or "").strip()
+            desc = (p.description or "").strip()
+            if not dev:
+                continue
+            is_mac = dev.startswith(("/dev/cu.", "/dev/ttyUSB", "/dev/ttyACM"))
+            is_win = bool(re.fullmatch(r"COM\d+", dev, re.IGNORECASE))
+            if not (is_mac or is_win):
+                continue
+            if "Bluetooth" in desc or "debug-console" in dev:
+                continue
+            found.append((dev, desc))
+        return sorted(set(found), key=lambda x: x[0])
+
+    def _refresh_ports(self, preferred: str | None = None) -> None:
+        if not hasattr(self, "port"):
+            return
+        current = (preferred or self.port.currentText() or "DEMO").strip() or "DEMO"
+        devices = self._serial_ports()
+        self.port.blockSignals(True)
+        self.port.clear()
+        self.port.addItem("DEMO")
+        for dev, desc in devices:
+            self.port.addItem(dev)
+            idx = self.port.count() - 1
+            self.port.setItemData(idx, f"{dev}\n{desc}" if desc else dev, Qt.ItemDataRole.ToolTipRole)
+        if current not in [self.port.itemText(i) for i in range(self.port.count())]:
+            self.port.addItem(current)
+        self.port.setCurrentText(current)
+        self.port.blockSignals(False)
 
     def _language_changed(self, _index: int) -> None:
         code = self.lang_combo.currentData()

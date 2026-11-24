@@ -115,7 +115,7 @@ QComboBox, QLineEdit, QDoubleSpinBox, QSpinBox {{
 }}
 QComboBox:hover, QLineEdit:hover, QDoubleSpinBox:hover, QSpinBox:hover {{ border-color: {C['green_border']}; }}
 QComboBox:focus, QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus {{ border: 1px solid {C['green']}; }}
-QComboBox::drop-down {{ border: none; width: 20px; }}
+QComboBox::drop-down {{ border: none; border-left: 1px solid {C['line']}; width: 24px; }}
 QComboBox QAbstractItemView {{ background: {C['panel']}; border: 1px solid {C['line']}; selection-background-color: {C['green_dim']}; selection-color: {C['text']}; color: {C['text']}; }}
 QDoubleSpinBox QLineEdit, QSpinBox QLineEdit {{ padding-left: 6px; background: transparent; border: none; }}
 QDoubleSpinBox::up-button, QDoubleSpinBox::down-button, QSpinBox::up-button, QSpinBox::down-button {{ width: 15px; background: {C['line_soft']}; border: none; }}

@@ -119,6 +119,9 @@ class JointControlDialog(QDialog):
         move.setObjectName("Primary")
         move.clicked.connect(self._move)
         lay.addWidget(move)
+        sync = QPushButton(tr("action.sync"))
+        sync.clicked.connect(self._open_sync)
+        lay.addWidget(sync)
         self.enable_btn = QPushButton(tr("action.disable"))
         self.enable_btn.clicked.connect(self._toggle_selected)
         lay.addWidget(self.enable_btn)
@@ -144,6 +147,9 @@ class JointControlDialog(QDialog):
         self.backend.snapshotChanged.connect(self._on_snapshot)
         self._on_snapshot(self.backend.snapshot())
         self._select(1)
+
+    def _open_sync(self) -> None:
+        SyncDialog(self.backend, self).exec()
 
     def _on_snapshot(self, snap: Snapshot) -> None:
         self.snap = snap
@@ -220,6 +226,121 @@ class JointControlDialog(QDialog):
     def _stop(self) -> None:
         self._cmd(lambda: self.backend.stop_all())
 
+
+class SyncDialog(QDialog):
+    """Six-axis synchronized absolute targets."""
+
+    def __init__(self, backend, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.backend = backend
+        self.snap: Optional[Snapshot] = None
+        _style(self)
+        self.setWindowTitle(tr("sync.title"))
+        self.resize(620, 440)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(10)
+        title = QLabel(tr("sync.title"))
+        title.setObjectName("SectionTitle")
+        root.addWidget(title)
+        sub = QLabel(tr("sync.sub"))
+        sub.setObjectName("Dim")
+        sub.setWordWrap(True)
+        root.addWidget(sub)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(6)
+        self.targets: list[QDoubleSpinBox] = []
+        self.current: list[QLabel] = []
+        for i in range(6):
+            lab = QLabel(tr(f"joint.{i + 1}"))
+            lab.setObjectName("Dim")
+            cur = QLabel("—")
+            cur.setObjectName("Dim")
+            cur.setFixedWidth(72)
+            spin = QDoubleSpinBox()
+            spin.setRange(-10000, 10000)
+            spin.setDecimals(2)
+            spin.setSingleStep(1.0)
+            spin.setSuffix(" °")
+            spin.setMinimumHeight(30)
+            spin.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+            grid.addWidget(lab, i, 0)
+            grid.addWidget(cur, i, 1)
+            grid.addWidget(spin, i, 2)
+            self.targets.append(spin)
+            self.current.append(cur)
+        grid.setColumnStretch(2, 1)
+        root.addLayout(grid)
+        root.addStretch(1)
+
+        params = QHBoxLayout()
+        params.addWidget(QLabel(tr("field.speed")))
+        self.rpm = QDoubleSpinBox()
+        self.rpm.setRange(0.01, 30.0)
+        self.rpm.setValue(0.20)
+        self.rpm.setDecimals(2)
+        self.rpm.setMaximumWidth(120)
+        params.addWidget(self.rpm)
+        params.addWidget(QLabel(tr("field.accel")))
+        self.accel = QDoubleSpinBox()
+        self.accel.setRange(1, 200)
+        self.accel.setValue(1)
+        self.accel.setDecimals(0)
+        self.accel.setMaximumWidth(100)
+        params.addWidget(self.accel)
+        params.addStretch(1)
+        root.addLayout(params)
+
+        row = QHBoxLayout()
+        self.move_btn = QPushButton(tr("sync.move"))
+        self.move_btn.setObjectName("Primary")
+        self.move_btn.clicked.connect(self._move_all)
+        self.stop_btn = QPushButton(tr("stop_all"))
+        self.stop_btn.setObjectName("Danger")
+        self.stop_btn.clicked.connect(self._stop)
+        close = QPushButton(tr("dialog.close"))
+        close.clicked.connect(self.accept)
+        row.addWidget(self.move_btn, 1)
+        row.addWidget(self.stop_btn)
+        row.addWidget(close)
+        root.addLayout(row)
+
+        self.backend.snapshotChanged.connect(self._on_snapshot)
+        self._on_snapshot(self.backend.snapshot())
+
+    def _on_snapshot(self, snap: Snapshot) -> None:
+        self.snap = snap
+        first = not getattr(self, "_initialized", False)
+        for i, (spin, cur) in enumerate(zip(self.targets, self.current)):
+            state = next((j for j in snap.joints if j.index == i + 1), None)
+            if state:
+                if first:
+                    spin.setValue(state.angle)
+                cur.setText(f"{state.angle:+.2f}°")
+            else:
+                cur.setText("—")
+            spin.setEnabled(snap.connected and bool(snap.joints))
+        if first and snap.connected and snap.joints:
+            self._initialized = True
+        self.move_btn.setEnabled(snap.connected and bool(snap.joints))
+        self.rpm.setEnabled(snap.connected)
+        self.accel.setEnabled(snap.connected)
+
+    def _move_all(self) -> None:
+        if not self.backend.connected:
+            return
+        try:
+            self.backend.move_all([s.value() for s in self.targets], self.rpm.value(), int(self.accel.value()))
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, tr("sync.title"), str(exc))
+
+    def _stop(self) -> None:
+        try:
+            self.backend.stop_all()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, tr("sync.title"), str(exc))
 
 class ConfigDialog(QDialog):
     def __init__(self, backend, parent: Optional[QWidget] = None) -> None:

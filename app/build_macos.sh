@@ -31,9 +31,9 @@ rm -rf build/Episode1 dist/Episode1.app dist/Episode1-macOS-*.zip
   --add-data "../kinematics/episode1_model.py:kinematics" \
   --add-data "assets/icon.png:assets" \
   --hidden-import numpy \
-  --hidden-import x42s_stepper \
-  --hidden-import can \
-  --hidden-import serial \
+  --collect-submodules x42s_stepper \
+  --collect-submodules can \
+  --collect-submodules serial \
   --collect-submodules episode1_app \
   main.py
 

@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import html
 import math
-import math
 from typing import Optional
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QRadialGradient
 from PySide6.QtWidgets import (
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -29,6 +29,26 @@ STATUS_KEYS = {
     STATUS_PROTECTED: "status.protected",
     STATUS_OFFLINE: "status.offline",
 }
+
+
+class PortComboBox(QComboBox):
+    """Editable port picker that refreshes its list when the popup opens."""
+
+    refreshRequested = Signal()
+
+    def showPopup(self) -> None:  # noqa: N802
+        self.refreshRequested.emit()
+        super().showPopup()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        super().paintEvent(event)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(QPen(QColor(C["muted"]), 1.5))
+        x = self.width() - 13
+        y = self.height() / 2 - 2
+        p.drawPolyline([QPointF(x, y), QPointF(x + 4, y + 4), QPointF(x + 8, y)])
+        p.end()
 
 
 class StatusPill(QLabel):
