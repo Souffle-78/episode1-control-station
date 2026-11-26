@@ -111,12 +111,6 @@ Windows 解压后运行 `Episode1.exe`；首次运行 SmartScreen 可能提示�
 4. `disable` 会让关节失去保持力，必须托住；`stop` 不切断电源。
 5. 做大角度动作前把底座夹紧；第一次动作手放在电源开关上。
 
-## 仍需完成
-
-1. J2 负限位起步异常（KI-001）根因未定位，现用“零点上移”规避。
-2. 通电全行程没有跑过，只验证了小角度和同步；需要人守着逐段测试。
-3. 报告仍是 `*_DRAFT.docx`，等导师审阅后再定稿。
-4. 若要自动回零，需要限位开关或绝对多圈编码器。
 
 详细记录见 [docs/validation.md](docs/validation.md) 和
 [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)。
