@@ -98,7 +98,7 @@ Windows 解压后运行 `Episode1.exe`；首次运行 SmartScreen 可能提示�
 - 机构简图：[kinematic_diagram.png](kinematics/docs/kinematic_diagram.png)；
 - STEP 三视图：[three_views.png](kinematics/docs/three_views.png)；
 - 详细公式与标定步骤：[KINEMATICS.md](kinematics/docs/KINEMATICS.md)；
-- 俄语导师报告：[advisor_report_ru.md](kinematics/docs/advisor_report_ru.md)。
+- 俄语报告：[advisor_report_ru.md](kinematics/docs/advisor_report_ru.md)。
 
 注意：`armctl.py state` 的角度不是 DH 角 `q`，也不是电机角 `m`；上实机前必须先按
 `KINEMATICS.md` 第 7 节标定零点和方向。
